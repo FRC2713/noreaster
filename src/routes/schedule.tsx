@@ -214,10 +214,10 @@ export default function ScheduleRoute() {
       red_score: null,
       blue_score: null,
       red_coral_rp: false,
-      red_algae_rp: false,
+      red_auto_rp: false,
       red_barge_rp: false,
       blue_coral_rp: false,
-      blue_algae_rp: false,
+      blue_auto_rp: false,
       blue_barge_rp: false,
     }));
     saveMatches.mutate(payload);

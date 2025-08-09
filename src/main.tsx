@@ -10,10 +10,14 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <div>Home Page</div> },
+      { index: true, lazy: () => import('./routes/home').then(m => ({ Component: m.default })) },
       { path: 'about', element: <div>About Page</div> },
       {
         path: 'auth',
+        lazy: () => import('./routes/auth').then(m => ({ Component: m.default })),
+      },
+      {
+        path: 'update-password',
         lazy: () => import('./routes/auth').then(m => ({ Component: m.default })),
       },
       {
@@ -54,7 +58,7 @@ const router = createBrowserRouter([
       },
     ],
   },
-])
+], { basename: import.meta.env.BASE_URL })
 
 const queryClient = new QueryClient()
 

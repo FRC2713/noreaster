@@ -11,11 +11,13 @@ interface MatchRow {
   red_score: number | null;
   blue_score: number | null;
   red_coral_rp: boolean;
-  red_algae_rp: boolean;
+  red_auto_rp: boolean;
   red_barge_rp: boolean;
   blue_coral_rp: boolean;
-  blue_algae_rp: boolean;
+  blue_auto_rp: boolean;
   blue_barge_rp: boolean;
+  red?: { name: string } | { name: string }[] | null;
+  blue?: { name: string } | { name: string }[] | null;
 }
 
 async function fetchAlliances(): Promise<Alliance[]> {
@@ -27,7 +29,7 @@ async function fetchAlliances(): Promise<Alliance[]> {
 async function fetchMatches(): Promise<MatchRow[]> {
   const { data, error } = await supabase
     .from("matches")
-    .select("id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_algae_rp, red_barge_rp, blue_coral_rp, blue_algae_rp, blue_barge_rp")
+    .select("id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp, red:alliances!matches_red_alliance_id_fkey(name), blue:alliances!matches_blue_alliance_id_fkey(name)")
     .order("scheduled_at", { ascending: true });
   if (error) throw error;
   return data ?? [];
@@ -66,15 +68,21 @@ export default function MatchesRoute() {
             <ul className="grid gap-2">
               {matches.map((m) => (
                 <li key={m.id}>
+                  {(() => {
+                    const redLabel = Array.isArray(m.red) ? (m.red[0]?.name ?? allianceName(m.red_alliance_id)) : (m.red?.name ?? allianceName(m.red_alliance_id));
+                    const blueLabel = Array.isArray(m.blue) ? (m.blue[0]?.name ?? allianceName(m.blue_alliance_id)) : (m.blue?.name ?? allianceName(m.blue_alliance_id));
+                    return (
                   <MatchCard
                     scheduledAt={m.scheduled_at}
-                    redName={allianceName(m.red_alliance_id)}
-                    blueName={allianceName(m.blue_alliance_id)}
+                    redName={redLabel}
+                    blueName={blueLabel}
                     redScore={m.red_score}
                     blueScore={m.blue_score}
                     showRelativeTime
                     editHref={`/matches/${m.id}`}
                   />
+                    );
+                  })()}
                 </li>
               ))}
             </ul>

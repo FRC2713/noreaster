@@ -14,10 +14,10 @@ type MatchRow = {
   red_score: number | null;
   blue_score: number | null;
   red_coral_rp: boolean;
-  red_algae_rp: boolean;
+  red_auto_rp: boolean;
   red_barge_rp: boolean;
   blue_coral_rp: boolean;
-  blue_algae_rp: boolean;
+  blue_auto_rp: boolean;
   blue_barge_rp: boolean;
 };
 
@@ -25,7 +25,7 @@ async function fetchMatch(id: string): Promise<MatchRow | null> {
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_algae_rp, red_barge_rp, blue_coral_rp, blue_algae_rp, blue_barge_rp"
+      "id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp"
     )
     .eq("id", id)
     .single();
@@ -69,10 +69,10 @@ export default function MatchEditRoute() {
     setRedScore(match.red_score != null ? String(match.red_score) : "");
     setBlueScore(match.blue_score != null ? String(match.blue_score) : "");
     setRedCoral(!!match.red_coral_rp);
-    setRedAlgae(!!match.red_algae_rp);
+    setRedAlgae(!!match.red_auto_rp);
     setRedBarge(!!match.red_barge_rp);
     setBlueCoral(!!match.blue_coral_rp);
-    setBlueAlgae(!!match.blue_algae_rp);
+    setBlueAlgae(!!match.blue_auto_rp);
     setBlueBarge(!!match.blue_barge_rp);
   }, [match]);
 
@@ -83,10 +83,10 @@ export default function MatchEditRoute() {
         red_score: redScore ? Number(redScore) : null,
         blue_score: blueScore ? Number(blueScore) : null,
         red_coral_rp: redCoral,
-        red_algae_rp: redAlgae,
+        red_auto_rp: redAlgae,
         red_barge_rp: redBarge,
         blue_coral_rp: blueCoral,
-        blue_algae_rp: blueAlgae,
+        blue_auto_rp: blueAlgae,
         blue_barge_rp: blueBarge,
       } as any;
       const { error } = await supabase.from("matches").update(payload).eq("id", matchId);
@@ -138,7 +138,7 @@ export default function MatchEditRoute() {
             <Switch checked={redCoral} onCheckedChange={setRedCoral} />
           </label>
           <label className="flex items-center justify-between py-2 text-lg">
-            <span>Algae RP</span>
+            <span>Auto RP</span>
             <Switch checked={redAlgae} onCheckedChange={setRedAlgae} />
           </label>
           <label className="flex items-center justify-between py-2 text-lg">
@@ -153,7 +153,7 @@ export default function MatchEditRoute() {
             <Switch checked={blueCoral} onCheckedChange={setBlueCoral} />
           </label>
           <label className="flex items-center justify-between py-2 text-lg">
-            <span>Algae RP</span>
+            <span>Auto RP</span>
             <Switch checked={blueAlgae} onCheckedChange={setBlueAlgae} />
           </label>
           <label className="flex items-center justify-between py-2 text-lg">

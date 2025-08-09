@@ -12,10 +12,10 @@ type MatchRow = {
   red_score: number | null;
   blue_score: number | null;
   red_coral_rp: boolean;
-  red_algae_rp: boolean;
+  red_auto_rp: boolean;
   red_barge_rp: boolean;
   blue_coral_rp: boolean;
-  blue_algae_rp: boolean;
+  blue_auto_rp: boolean;
   blue_barge_rp: boolean;
 };
 
@@ -29,7 +29,7 @@ async function fetchMatches(): Promise<MatchRow[]> {
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id, red_alliance_id, blue_alliance_id, red_score, blue_score, red_coral_rp, red_algae_rp, red_barge_rp, blue_coral_rp, blue_algae_rp, blue_barge_rp"
+      "id, red_alliance_id, blue_alliance_id, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp"
     );
   if (error) throw error;
   return data ?? [];
@@ -102,8 +102,8 @@ export default function RankingsRoute() {
         }
 
         // Extra RP booleans (played matches only)
-        addRp(red.id, (m.red_coral_rp ? 1 : 0) + (m.red_algae_rp ? 1 : 0) + (m.red_barge_rp ? 1 : 0));
-        addRp(blue.id, (m.blue_coral_rp ? 1 : 0) + (m.blue_algae_rp ? 1 : 0) + (m.blue_barge_rp ? 1 : 0));
+      addRp(red.id, (m.red_coral_rp ? 1 : 0) + (m.red_auto_rp ? 1 : 0) + (m.red_barge_rp ? 1 : 0));
+      addRp(blue.id, (m.blue_coral_rp ? 1 : 0) + (m.blue_auto_rp ? 1 : 0) + (m.blue_barge_rp ? 1 : 0));
 
         // Scores for average score tiebreaker
         red.totalScore += m.red_score!; red.countedScoreMatches += 1;
