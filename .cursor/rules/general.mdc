@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+1. This project uses react router v7, react 19, tailwind 4, and shadcnui
+2. when creating components, prefer to use shadcn-ui elements.  If one is not installed, ask to isntall it.
+3. this project uses supabase as a backend.
