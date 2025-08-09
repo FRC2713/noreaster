@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { DndContext, useDroppable, useDraggable, rectIntersection } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { supabase } from "../supabase/client";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { RobotImage } from "@/components/robot-image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -61,13 +61,9 @@ function DraggableTeamCard({ team }: { team: Team }) {
       title={`${team.number} ${team.name}`}
     >
       <div className="flex items-center gap-3">
-        <div className="size-12 items-center justify-center">
-          <RobotImage team={team} className="rounded overflow-hidden bg-muted" />
-        </div>
-        <div className="min-w-0">
           <div className="font-semibold leading-tight">{team.number}</div>
           <div className="text-xs text-muted-foreground truncate">{team.name}</div>
-        </div>
+        
       </div>
     </div>
   );
@@ -306,7 +302,7 @@ export default function AlliancesRoute() {
             {alliances.map((a) => (
               <div key={a.id} className="rounded-md border">
                 <div className="px-3 py-2 border-b font-medium flex items-center justify-between gap-3">
-                  <a href={`/alliances/${a.id}`} className="hover:underline">{a.name}</a>
+                  <Link to={`/alliances/${a.id}`} className="hover:underline">{a.name}</Link>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm">Delete</Button>
