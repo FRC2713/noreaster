@@ -1,5 +1,5 @@
 import { supabase } from "../supabase/client";
-import { RobotImage } from "@/components/robot-image";
+import { TeamCard } from "@/components/team-card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 
@@ -34,12 +34,8 @@ export default function Component() {
       ) : (
         <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {teams.map((t) => (
-            <li key={t.id} className="border rounded-lg overflow-hidden">
-              <RobotImage team={t} className="w-full bg-muted" />
-              <div className="p-4">
-                <div className="text-lg font-medium">{t.number}</div>
-                <div className="text-sm opacity-80">{t.name}</div>
-              </div>
+            <li key={t.id}>
+              <TeamCard team={t} />
             </li>
           ))}
         </ul>

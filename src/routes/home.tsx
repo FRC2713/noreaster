@@ -4,6 +4,9 @@ import { supabase } from "../supabase/client";
 import { MatchCard } from "@/components/match-card";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
+import { RankingsTable, type RankingRow } from "@/components/rankings-table";
+import { SectionCard } from "@/components/section-card";
+import { SectionHeader } from "@/components/section-header";
 
 type Alliance = { id: string; name: string };
 type MatchRow = {
@@ -84,7 +87,7 @@ export default function HomeRoute() {
     return alliances.find((a) => a.id === id)?.name ?? id;
   }
 
-  const rankings = useMemo(() => {
+  const rankings = useMemo<RankingRow[]>(() => {
     const idToStats = new Map<string, { id: string; name: string; played: number; totalRp: number; totalScore: number; counted: number }>();
     alliances.forEach((a) => idToStats.set(a.id, { id: a.id, name: a.name, played: 0, totalRp: 0, totalScore: 0, counted: 0 }));
     const addRp = (id: string, rp: number) => { const s = idToStats.get(id); if (s) s.totalRp += rp; };
@@ -114,22 +117,19 @@ export default function HomeRoute() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Link to="/matches"><Button variant="outline">Matches</Button></Link>
-          <Link to="/rankings"><Button variant="outline">Rankings</Button></Link>
-          <Link to="/schedule"><Button variant="outline">Schedule</Button></Link>
-        </div>
-      </div>
+      <SectionHeader
+        title="Dashboard"
+        actions={(
+          <div className="flex items-center gap-2">
+            <Link to="/matches"><Button variant="outline">Matches</Button></Link>
+            <Link to="/rankings"><Button variant="outline">Rankings</Button></Link>
+            <Link to="/schedule"><Button variant="outline">Schedule</Button></Link>
+          </div>
+        )}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-lg border">
-          <div className="border-b px-4 py-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Upcoming Matches</h2>
-            <Link to="/matches/preview" className="text-sm underline">Preview</Link>
-          </div>
-          <div className="p-4">
+        <SectionCard title="Upcoming Matches" right={<Link to="/matches/preview" className="text-sm underline">Preview</Link>}>
             {upLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
             {upError && <div className="text-sm text-red-600">{String(upError)}</div>}
             {!upLoading && !upError && (
@@ -157,51 +157,18 @@ export default function HomeRoute() {
                 </ul>
               )
             )}
-          </div>
-        </section>
+        </SectionCard>
 
-        <section className="rounded-lg border overflow-hidden">
-          <div className="border-b px-4 py-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Rankings (Top 8)</h2>
-            <Link to="/rankings" className="text-sm underline">View all</Link>
-          </div>
-          <div className="p-4 overflow-x-auto">
+        <SectionCard title="Rankings (Top 8)" right={<Link to="/rankings" className="text-sm underline">View all</Link>}>
+          <div className="overflow-x-auto">
             {rLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
             {rError && <div className="text-sm text-red-600">{String(rError)}</div>}
-            {!rLoading && !rError && (
-              <table className="w-full text-sm">
-                <thead className="text-left opacity-70">
-                  <tr>
-                    <th className="py-1 pr-3">Rank</th>
-                    <th className="py-1 pr-3">Alliance</th>
-                    <th className="py-1 pr-3">Played</th>
-                    <th className="py-1 pr-3">Avg RP</th>
-                    <th className="py-1">Avg Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankings.map((r) => (
-                    <tr key={r.id} className="border-t">
-                      <td className="py-1 pr-3 font-medium">{r.rank}</td>
-                      <td className="py-1 pr-3">{r.name}</td>
-                      <td className="py-1 pr-3">{r.played}</td>
-                      <td className="py-1 pr-3">{r.avgRp.toFixed(3)}</td>
-                      <td className="py-1">{r.avgScore.toFixed(1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {!rLoading && !rError && <RankingsTable rows={rankings} showRank size="sm" />}
           </div>
-        </section>
+        </SectionCard>
       </div>
 
-      <section className="rounded-lg border">
-        <div className="border-b px-4 py-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent Matches</h2>
-          <Link to="/matches" className="text-sm underline">View all</Link>
-        </div>
-        <div className="p-4">
+      <SectionCard title="Recent Matches" right={<Link to="/matches" className="text-sm underline">View all</Link>}>
           {prevLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
           {prevError && <div className="text-sm text-red-600">{String(prevError)}</div>}
           {!prevLoading && !prevError && (
@@ -228,8 +195,7 @@ export default function HomeRoute() {
               </ul>
             )
           )}
-        </div>
-      </section>
+      </SectionCard>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../supabase/client";
 import { Button } from "@/components/ui/button";
 import { Maximize, Minimize } from "lucide-react";
+import { RankingsTable } from "@/components/rankings-table";
 
 type Alliance = { id: string; name: string };
 type MatchRow = {
@@ -180,30 +181,7 @@ export default function RankingsRoute() {
       {error && <p className="text-2xl text-red-600">{String(error)}</p>}
       {!loading && !error && (
         <div className="flex-1 overflow-auto rounded-lg border">
-          <table className="w-full text-2xl md:text-3xl">
-            <thead className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <tr className="text-left border-b">
-                <th className="py-4 px-4">Rank</th>
-                <th className="py-4 px-4">Alliance</th>
-                <th className="py-4 px-4">Played</th>
-                <th className="py-4 px-4">W-L-T</th>
-                <th className="py-4 px-4">Avg RP</th>
-                <th className="py-4 px-4">Avg Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rankings.map((r: any, idx: number) => (
-                <tr key={r.id} className={`border-b ${idx % 2 === 0 ? "bg-muted/30" : ""}`}>
-                  <td className="py-4 px-4 font-semibold">{r.rank}</td>
-                  <td className="py-4 px-4 font-semibold">{r.name}</td>
-                  <td className="py-4 px-4">{r.played}</td>
-                  <td className="py-4 px-4">{r.wins}-{r.losses}-{r.ties}</td>
-                  <td className="py-4 px-4">{r.avgRp.toFixed(3)}</td>
-                  <td className="py-4 px-4">{r.avgScore.toFixed(1)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <RankingsTable rows={rankings} showWLT showRank size="lg" />
         </div>
       )}
     </div>

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function Component() {
   const [email, setEmail] = useState("");
@@ -109,48 +111,28 @@ export default function Component() {
       <h1 className="text-2xl font-semibold mb-4">{resetMode ? "Reset password" : "Sign in"}</h1>
       {resetMode ? (
         <form onSubmit={handleUpdatePassword} className="space-y-3">
-          <input
-            type="password"
-            required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New password"
-            className="w-full rounded-md border px-3 py-2 outline-hidden"
-            autoComplete="new-password"
-          />
-          <input
-            type="password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm new password"
-            className="w-full rounded-md border px-3 py-2 outline-hidden"
-            autoComplete="new-password"
-          />
+          <div className="grid gap-1.5">
+            <Label>New password</Label>
+            <Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Confirm new password</Label>
+            <Input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
+          </div>
           <button disabled={loading} type="submit" className="rounded-md bg-black text-white px-3 py-2 hover:opacity-90 disabled:opacity-60 dark:bg-white dark:text-black">
             {loading ? "Saving..." : "Update password"}
           </button>
         </form>
       ) : (
         <form onSubmit={handleSignIn} className="space-y-3">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="w-full rounded-md border px-3 py-2 outline-hidden"
-            autoComplete="username"
-          />
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full rounded-md border px-3 py-2 outline-hidden"
-            autoComplete="current-password"
-          />
+          <div className="grid gap-1.5">
+            <Label>Email</Label>
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Password</Label>
+            <Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          </div>
           <div className="flex items-center gap-3">
             <button disabled={loading} type="submit" className="rounded-md bg-black text-white px-3 py-2 hover:opacity-90 disabled:opacity-60 dark:bg-white dark:text-black">
               {loading ? "Signing in..." : "Sign in"}

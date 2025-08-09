@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../supabase/client";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { AllianceRPToggles } from "@/components/alliance-rp-toggles";
 
 type Alliance = { id: string; name: string };
 type MatchRow = {
@@ -131,36 +131,24 @@ export default function MatchEditRoute() {
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="border rounded-md p-4">
-          <div className="font-semibold mb-3 text-lg">Red Alliance RP</div>
-          <label className="flex items-center justify-between py-2 text-lg">
-            <span>Coral RP</span>
-            <Switch checked={redCoral} onCheckedChange={setRedCoral} />
-          </label>
-          <label className="flex items-center justify-between py-2 text-lg">
-            <span>Auto RP</span>
-            <Switch checked={redAlgae} onCheckedChange={setRedAlgae} />
-          </label>
-          <label className="flex items-center justify-between py-2 text-lg">
-            <span>Barge RP</span>
-            <Switch checked={redBarge} onCheckedChange={setRedBarge} />
-          </label>
-        </div>
-        <div className="border rounded-md p-4">
-          <div className="font-semibold mb-3 text-lg">Blue Alliance RP</div>
-          <label className="flex items-center justify-between py-2 text-lg">
-            <span>Coral RP</span>
-            <Switch checked={blueCoral} onCheckedChange={setBlueCoral} />
-          </label>
-          <label className="flex items-center justify-between py-2 text-lg">
-            <span>Auto RP</span>
-            <Switch checked={blueAlgae} onCheckedChange={setBlueAlgae} />
-          </label>
-          <label className="flex items-center justify-between py-2 text-lg">
-            <span>Barge RP</span>
-            <Switch checked={blueBarge} onCheckedChange={setBlueBarge} />
-          </label>
-        </div>
+        <AllianceRPToggles
+          title="Red Alliance RP"
+          coral={redCoral}
+          auto={redAlgae}
+          barge={redBarge}
+          onCoralChange={setRedCoral}
+          onAutoChange={setRedAlgae}
+          onBargeChange={setRedBarge}
+        />
+        <AllianceRPToggles
+          title="Blue Alliance RP"
+          coral={blueCoral}
+          auto={blueAlgae}
+          barge={blueBarge}
+          onCoralChange={setBlueCoral}
+          onAutoChange={setBlueAlgae}
+          onBargeChange={setBlueBarge}
+        />
       </div>
 
       <div className="flex items-center gap-3">
