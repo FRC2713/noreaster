@@ -74,6 +74,13 @@ ALTER TABLE public.matches
 - `/auth`: email/password sign-in.
 
 ## Tech Notes
+- Deploy to GitHub Pages
+  - Set `base: '/noreaster/'` in `vite.config.ts` (already set)
+  - Ensure repo remote is `git@github.com:FRC2713/noreaster.git`
+  - Build: `npm run build`
+  - Deploy: `npm run deploy` (publishes `dist` to `gh-pages` branch)
+  - In GitHub repo → Settings → Pages → set source to `gh-pages` branch
+
 
 - Styling: Tailwind v4 with CSS-first config and shadcn/ui components
 - Data: Supabase client (`src/supabase/client.ts`), TanStack Query for data fetching/mutations
