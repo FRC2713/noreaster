@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cursor files that contain the Supabase access token
+.cursor/*

@@ -35,7 +35,9 @@ export default function Component() {
         <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {teams.map((t) => (
             <li key={t.id}>
-              <TeamCard team={t} />
+              <Link to={`/teams/${t.id}`} className="block">
+                <TeamCard team={t} />
+              </Link>
             </li>
           ))}
         </ul>

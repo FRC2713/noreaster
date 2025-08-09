@@ -31,6 +31,7 @@ function formatRelative(iso: string) {
 }
 
 export function MatchCard({
+  title,
   scheduledAt,
   redName,
   blueName,
@@ -40,6 +41,7 @@ export function MatchCard({
   redScore,
   blueScore,
 }: {
+  title?: string;
   scheduledAt?: string | null;
   redName: string;
   blueName: string;
@@ -65,7 +67,16 @@ export function MatchCard({
 
   return (
     <div className="border rounded-md p-3 text-sm flex items-center justify-between gap-3">
-      <div className="whitespace-nowrap">{timeLabel}</div>
+      <div className="whitespace-nowrap min-w-[8rem]">
+        {title ? (
+          <div>
+            <div className="font-semibold">{title}</div>
+            <div className="opacity-70">{timeLabel}</div>
+          </div>
+        ) : (
+          <div>{timeLabel}</div>
+        )}
+      </div>
       <div className="font-medium flex items-center gap-2 min-w-0">
         {(() => {
           const hasScores = redScore !== undefined && redScore !== null && blueScore !== undefined && blueScore !== null;

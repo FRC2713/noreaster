@@ -8,6 +8,7 @@ import { AllianceRPToggles } from "@/components/alliance-rp-toggles";
 type Alliance = { id: string; name: string };
 type MatchRow = {
   id: string;
+  name?: string | null;
   red_alliance_id: string;
   blue_alliance_id: string;
   scheduled_at: string | null;
@@ -25,7 +26,7 @@ async function fetchMatch(id: string): Promise<MatchRow | null> {
   const { data, error } = await supabase
     .from("matches")
     .select(
-      "id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp"
+      "id, name, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp"
     )
     .eq("id", id)
     .single();
@@ -113,7 +114,7 @@ export default function MatchEditRoute() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
         <Link to="/matches"><Button variant="ghost">← Back</Button></Link>
-        <h1 className="text-2xl font-semibold">Edit Match</h1>
+        <h1 className="text-2xl font-semibold">{match.name ?? "Edit Match"}</h1>
       </div>
 
       <div className="rounded-md border p-4">

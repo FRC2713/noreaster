@@ -29,6 +29,10 @@ const router = createBrowserRouter([
         lazy: () => import('./routes/teams').then(m => ({ Component: m.default })),
       },
       {
+        path: 'teams/:teamId',
+        lazy: () => import('./routes/team').then(m => ({ Component: m.default })),
+      },
+      {
         path: 'alliances',
         lazy: () => import('./routes/alliances').then(m => ({ Component: m.default })),
       },

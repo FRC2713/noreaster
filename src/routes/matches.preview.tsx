@@ -5,6 +5,7 @@ import { RobotImage } from "@/components/robot-image";
 
 type MatchRow = {
   id: string;
+  name: string | null;
   red_alliance_id: string;
   blue_alliance_id: string;
   scheduled_at: string | null;
@@ -18,7 +19,7 @@ type Team = { id: string; number: number; name: string; robot_image_url: string 
 async function fetchNextUnplayedMatch(): Promise<MatchRow | null> {
   const { data, error } = await supabase
     .from("matches")
-    .select("id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score")
+    .select("id, name, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score")
     .is("red_score", null)
     .is("blue_score", null)
     .order("scheduled_at", { ascending: true, nullsFirst: true })

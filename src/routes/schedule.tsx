@@ -207,7 +207,8 @@ export default function ScheduleRoute() {
 
   function save() {
     if (generated.length === 0) return;
-    const payload = generated.map((m) => ({
+    const payload = generated.map((m, idx) => ({
+      name: `Match ${idx + 1}`,
       red_alliance_id: m.red_alliance_id,
       blue_alliance_id: m.blue_alliance_id,
       scheduled_at: m.scheduled_at,

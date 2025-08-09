@@ -5,6 +5,7 @@ import { supabase } from "../supabase/client";
 interface Alliance { id: string; name: string }
 interface MatchRow {
   id: string;
+  name: string | null;
   red_alliance_id: string;
   blue_alliance_id: string;
   scheduled_at: string | null;
@@ -29,7 +30,7 @@ async function fetchAlliances(): Promise<Alliance[]> {
 async function fetchMatches(): Promise<MatchRow[]> {
   const { data, error } = await supabase
     .from("matches")
-    .select("id, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp, red:alliances!matches_red_alliance_id_fkey(name), blue:alliances!matches_blue_alliance_id_fkey(name)")
+    .select("id, name, red_alliance_id, blue_alliance_id, scheduled_at, red_score, blue_score, red_coral_rp, red_auto_rp, red_barge_rp, blue_coral_rp, blue_auto_rp, blue_barge_rp, red:alliances!matches_red_alliance_id_fkey(name), blue:alliances!matches_blue_alliance_id_fkey(name)")
     .order("scheduled_at", { ascending: true });
   if (error) throw error;
   return data ?? [];
@@ -73,6 +74,7 @@ export default function MatchesRoute() {
                     const blueLabel = Array.isArray(m.blue) ? (m.blue[0]?.name ?? allianceName(m.blue_alliance_id)) : (m.blue?.name ?? allianceName(m.blue_alliance_id));
                     return (
                   <MatchCard
+                    title={m.name ?? undefined}
                     scheduledAt={m.scheduled_at}
                     redName={redLabel}
                     blueName={blueLabel}
