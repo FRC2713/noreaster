@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router";
 import { supabase } from "../supabase/client";
 import { RobotImage } from "@/components/robot-image";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 type Team = {
   id: string;
@@ -16,6 +19,10 @@ export default function AllianceDetail() {
   const { allianceId } = useParams();
   const [name, setName] = useState<string>("");
   const [teams, setTeams] = useState<(Team | null)[]>([null, null, null, null]);
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: allianceRow, isLoading: aLoading, error: aError } = useQuery({
     queryKey: ["alliances", "byId", allianceId],
@@ -23,7 +30,7 @@ export default function AllianceDetail() {
       if (!allianceId) return null as any;
       const { data, error } = await supabase
         .from("alliances")
-        .select("id, name, created_at")
+        .select("id, name, emblem_image_url, created_at")
         .eq("id", allianceId)
         .single();
       if (error) throw error;
@@ -70,18 +77,90 @@ export default function AllianceDetail() {
     setTeams(slots);
   }, [allianceRow, ats, teamRows]);
 
+  const previewSrc = useMemo(() => {
+    if (file) return URL.createObjectURL(file);
+    return (allianceRow as any)?.emblem_image_url ?? null;
+  }, [file, allianceRow]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!allianceId) return;
+      setStatus(null);
+      let emblemUrl: string | null = (allianceRow as any)?.emblem_image_url ?? null;
+      if (file) {
+        const ext = (file.name.split(".").pop() || "png").toLowerCase();
+        const objectPath = `emblems/${Date.now()}_${Math.random().toString(16).slice(2, 8)}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("alliances")
+          .upload(objectPath, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from("alliances").getPublicUrl(objectPath);
+        emblemUrl = data.publicUrl;
+      }
+      const { error: updateError } = await supabase
+        .from("alliances")
+        .update({ name, emblem_image_url: emblemUrl })
+        .eq("id", allianceId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      setStatus("Saved.");
+      setFile(null);
+      void queryClient.invalidateQueries({ queryKey: ["alliances", "byId", allianceId] });
+      void queryClient.invalidateQueries({ queryKey: ["alliances", "list"] });
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Failed to save";
+      setStatus(msg);
+    },
+    onSettled: () => setIsSaving(false),
+  });
+
   if (!allianceId) return <p>Missing alliance id</p>;
   if (aLoading || atsLoading || tLoading) return <p>Loading alliance...</p>;
   const error = aError || atsError || tError;
   if (error) return <p className="text-red-600">Error: {String(error)}</p>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3">
         <Link to="/alliances">
           <Button variant="ghost">← Back</Button>
         </Link>
-        <h1 className="text-2xl font-semibold">{name}</h1>
+        <h1 className="text-2xl font-semibold">Alliance</h1>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
+        <div className="space-y-2">
+          <AspectRatio ratio={1} className="rounded-md border overflow-hidden bg-muted">
+            {previewSrc ? (
+              <img src={previewSrc} alt="Alliance emblem" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full grid place-items-center text-sm text-muted-foreground">No emblem</div>
+            )}
+          </AspectRatio>
+          <div className="grid gap-1.5">
+            <Label htmlFor="emblem">Emblem (1:1)</Label>
+            <Input id="emblem" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setIsSaving(true);
+            saveMutation.mutate();
+          }}
+          className="grid gap-3 content-start"
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="name">Alliance Name</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={isSaving}>{isSaving ? "Saving..." : "Save"}</Button>
+            {status && <span className="text-sm opacity-80">{status}</span>}
+          </div>
+        </form>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

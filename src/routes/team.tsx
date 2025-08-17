@@ -108,7 +108,7 @@ export default function Component() {
   if (error || !team) return <p className="text-red-600">Team not found.</p>;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit Team</h1>
         <Link to="/teams" className="text-sm hover:underline">Back to Teams</Link>

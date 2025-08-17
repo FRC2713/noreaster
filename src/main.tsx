@@ -11,7 +11,6 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, lazy: () => import('./routes/home').then(m => ({ Component: m.default })) },
-      { path: 'about', element: <div>About Page</div> },
       {
         path: 'auth',
         lazy: () => import('./routes/auth').then(m => ({ Component: m.default })),

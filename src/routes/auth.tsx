@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { supabase } from "../supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function Component() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function Component() {
           }
         }
         if (type === "recovery") setResetMode(true);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -55,9 +57,10 @@ export default function Component() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      setStatus("Signed in!");
-    } catch (err: any) {
-      setStatus(`Error: ${err?.message || "Unable to sign in."}`);
+      navigate("/");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to sign in.";
+      setStatus(`Error: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -75,8 +78,9 @@ export default function Component() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
       setStatus("Password reset link sent. Check your email.");
-    } catch (err: any) {
-      setStatus(`Error: ${err?.message || "Unable to send reset link."}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to send reset link.";
+      setStatus(`Error: ${msg}`);
     }
   }
 
@@ -99,15 +103,16 @@ export default function Component() {
       setResetMode(false);
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      setStatus(`Error: ${err?.message || "Unable to update password."}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to update password.";
+      setStatus(`Error: ${msg}`);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-sm">
+    <div className="max-w-sm mx-auto">
       <h1 className="text-2xl font-semibold mb-4">{resetMode ? "Reset password" : "Sign in"}</h1>
       {resetMode ? (
         <form onSubmit={handleUpdatePassword} className="space-y-3">
@@ -145,9 +150,6 @@ export default function Component() {
       {!resetMode && (
         <div className="mt-6 text-sm text-muted-foreground space-y-2">
           <p>Sign-up is disabled. Ask an admin to create your account or change your password.</p>
-          <p>
-            Admins: In Supabase Dashboard → Authentication → Providers → Email, disable new signups. To change a user's password, open Authentication → Users → select user → Reset Password.
-          </p>
         </div>
       )}
     </div>

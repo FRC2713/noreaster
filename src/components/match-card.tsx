@@ -4,7 +4,7 @@ import { Link } from "react-router";
 function formatRelative(iso: string) {
   const target = new Date(iso).getTime();
   const now = Date.now();
-  let diff = Math.round((target - now) / 1000); // seconds
+  const diff = Math.round((target - now) / 1000); // seconds
   const abs = Math.abs(diff);
 
   const minute = 60;
@@ -40,6 +40,8 @@ export function MatchCard({
   editHref,
   redScore,
   blueScore,
+  matchNumber,
+  round,
 }: {
   title?: string;
   scheduledAt?: string | null;
@@ -50,6 +52,8 @@ export function MatchCard({
   editHref?: string;
   redScore?: number | null;
   blueScore?: number | null;
+  matchNumber?: number;
+  round?: number;
 }) {
   let timeLabel = "Unscheduled";
   if (scheduledAt) {
@@ -75,6 +79,9 @@ export function MatchCard({
           </div>
         ) : (
           <div>{timeLabel}</div>
+        )}
+        {round && (
+          <div className="text-xs opacity-60 mt-1">Round {round} Match {matchNumber} </div>
         )}
       </div>
       <div className="font-medium flex items-center gap-2 min-w-0">

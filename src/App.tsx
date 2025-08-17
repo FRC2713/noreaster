@@ -1,6 +1,33 @@
-import { Link, Outlet } from "react-router";
+import { Link, Outlet, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { supabase } from "./supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { User as UserIcon } from "lucide-react";
 
 function AppLayout() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<null | { id: string; email?: string }>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (isMounted) setUser(data.user ? { id: data.user.id, email: data.user.email ?? undefined } : null);
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null);
+    });
+    return () => {
+      isMounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    navigate("/");
+  }
+
   return (
     <div className="min-h-dvh flex flex-col">
       <header className="border-b">
@@ -14,8 +41,25 @@ function AppLayout() {
           <Link to="/alliances" className="hover:underline">Alliances</Link>
           <Link to="/matches" className="hover:underline">Matches</Link>
           <Link to="/schedule" className="hover:underline">Schedule</Link>
-          <Link to="/about" className="hover:underline">About</Link>
-          <Link to="/auth" className="hover:underline">Auth</Link>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button aria-label="Account" className="rounded-full border size-9 grid place-items-center hover:bg-accent">
+                <UserIcon className="size-5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-40 p-2">
+              {user ? (
+                <div className="grid gap-1">
+                  {user.email && <div className="px-2 py-1 text-xs text-muted-foreground truncate">{user.email}</div>}
+                  <button onClick={handleSignOut} className="w-full text-left px-2 py-1 rounded hover:bg-accent">Sign out</button>
+                </div>
+              ) : (
+                <div className="grid gap-1">
+                  <Link to="/auth" className="px-2 py-1 rounded hover:bg-accent">Sign in</Link>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
         </nav>
       </header>
       <main className="container mx-auto flex-1 p-6">
