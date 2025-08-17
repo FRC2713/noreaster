@@ -1,4 +1,4 @@
-import{w as d,r,j as e,s as u}from"./index-BbsRpNjG.js";import{u as i}from"./useQuery-CDvurSQj.js";import{B as _}from"./button-DzpIyQ-0.js";import{c as v,R as y}from"./rankings-C0qN6Lfq.js";/**
+import{w as d,r,j as e,s as u}from"./index-BzX4-QBV.js";import{u as i}from"./useQuery-MXQqrAhs.js";import{B as _}from"./button-DR301_bp.js";import{c as v,R as y}from"./rankings-D1v5p-Gl.js";/**
  * @license lucide-react v0.539.0 - ISC
  *
  * This source code is licensed under the ISC license.
