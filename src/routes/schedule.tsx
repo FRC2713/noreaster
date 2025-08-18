@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +18,8 @@ import type { RoundRobinRound, LunchBreak, ScheduleBlock } from "@/lib/schedule-
 import { supabase } from "@/supabase/client";
 import { formatTime } from "@/lib/utils";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useAlliancesPolling } from "@/lib/use-alliances-polling";
+import { useMatchesPolling } from "@/lib/use-matches-polling";
 
 
 // Type for database schedule records
@@ -128,15 +131,10 @@ export default function ScheduleRoute() {
   const [lunchDurationMin, setLunchDurationMin] = useState(DEFAULT_SETTINGS.lunchDurationMin);
   const [generatedBlocks, setGeneratedBlocks] = useState<ScheduleBlock<RoundRobinRound | LunchBreak>[]>([]);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
+  const [isStatsExpanded, setIsStatsExpanded] = useState(false);
 
-  const { data: alliances = [], isLoading: alliancesLoading, error: alliancesError } = useQuery({
-    queryKey: ["alliances", "list"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("alliances").select("id, name").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { alliances } = useAlliancesPolling();
+  const { matches: existingMatches } = useMatchesPolling();
 
   // Load existing schedule from database
   const { data: existingSchedule = [], isLoading: scheduleLoading } = useQuery({
@@ -148,20 +146,29 @@ export default function ScheduleRoute() {
     },
   });
 
-  // Load existing matches from database
-  const { data: existingMatches = [] } = useQuery({
-    queryKey: ["matches", "list"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("matches").select("*").order("scheduled_at");
-      if (error) throw error;
-      return (data ?? []) as MatchRecord[];
-    },
-  });
-
   // Transform database data to ScheduleBlock format
   const transformedExistingSchedule = useMemo(() => {
     if (existingSchedule.length === 0 || existingMatches.length === 0) return [];
-    return transformScheduleData(existingSchedule, existingMatches);
+    
+    // Transform store matches to MatchRecord format
+    const transformedMatches: MatchRecord[] = existingMatches.map(match => ({
+      id: match.id,
+      name: match.name,
+      red_alliance_id: match.red_alliance_id,
+      blue_alliance_id: match.blue_alliance_id,
+      scheduled_at: match.scheduled_at,
+      red_score: match.red_score,
+      blue_score: match.blue_score,
+      red_coral_rp: !!match.red_coral_rp,
+      red_auto_rp: !!match.red_auto_rp,
+      red_barge_rp: !!match.red_barge_rp,
+      blue_coral_rp: !!match.blue_coral_rp,
+      blue_auto_rp: !!match.blue_auto_rp,
+      blue_barge_rp: !!match.blue_barge_rp,
+      created_at: new Date().toISOString(), // Default value since store doesn't have this
+    }));
+    
+    return transformScheduleData(existingSchedule, transformedMatches);
   }, [existingSchedule, existingMatches]);
 
   // Check if there's existing data to display
@@ -210,7 +217,7 @@ export default function ScheduleRoute() {
     },
     onSuccess: (_, variables) => {
       setStatus(`Saved ${variables.length} matches.`);
-      void queryClient.invalidateQueries({ queryKey: ["matches", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
     },
     onError: (e: Error) => {
       setStatus(`Save failed: ${e?.message ?? "Unknown error"}`);
@@ -274,7 +281,7 @@ export default function ScheduleRoute() {
       } else {
         setStatus(`Saved ${matchesPayload.length} matches and ${generatedBlocks.length} schedule blocks with match IDs.`);
       }
-      void queryClient.invalidateQueries({ queryKey: ["matches", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
       void queryClient.invalidateQueries({ queryKey: ["schedule", "list"] });
     }).catch((error) => {
       setStatus(`Save failed: ${error?.message ?? "Unknown error"}`);
@@ -330,7 +337,7 @@ export default function ScheduleRoute() {
       setExpandedRounds(new Set());
       
       setStatus("✅ All schedule data has been permanently deleted.");
-      void queryClient.invalidateQueries({ queryKey: ["matches", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
       void queryClient.invalidateQueries({ queryKey: ["schedule", "list"] });
     } catch (error) {
       setStatus(`Error during deletion: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -347,8 +354,8 @@ export default function ScheduleRoute() {
             <p className="text-muted-foreground">Generate and manage tournament schedules</p>
           </div>
           <div className="flex items-center gap-2">
-            {alliancesLoading && <Badge className="bg-secondary text-secondary-foreground">Loading...</Badge>}
-            {alliancesError && <Badge className="bg-destructive text-destructive-foreground">Error</Badge>}
+            {alliances.length === 0 && <Badge className="bg-secondary text-secondary-foreground">No alliances loaded</Badge>}
+            {alliances.length > 0 && <Badge className="bg-green-600 text-white">{alliances.length} alliances</Badge>}
           </div>
         </div>
 
@@ -356,61 +363,87 @@ export default function ScheduleRoute() {
 
         {/* Stats Overview */}
         {stats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5" />
-                Schedule Statistics
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{stats.totalMatches}</div>
-                  <div className="text-sm text-muted-foreground">Total Matches</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{stats.totalRounds}</div>
-                  <div className="text-sm text-muted-foreground">Total Rounds</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{Math.floor(stats.totalMatches / stats.totalRounds)}</div>
-                  <div className="text-sm text-muted-foreground">Matches per Round</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{stats.avgMatchesPerAlliance.toFixed(1)}</div>
-                  <div className="text-sm text-muted-foreground">Avg per Alliance</div>
-                </div>
-              </div>
-              
-              <ScrollArea className="h-64">
-                <table className="w-full text-sm">
-                  <thead className="text-left">
-                    <tr className="border-b">
-                      <th className="py-2 pr-4 font-medium">Alliance</th>
-                      <th className="py-2 pr-4 font-medium">Matches</th>
-                      <th className="py-2 pr-4 font-medium text-red-600">Red</th>
-                      <th className="py-2 pr-4 font-medium text-blue-600">Blue</th>
-                      <th className="py-2 pr-4 font-medium">Avg Turnaround</th>
-                      <th className="py-2 pr-4 font-medium">Range</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.rows.map((r) => (
-                      <tr key={r.id} className="border-b hover:bg-muted/50">
-                        <td className="py-2 pr-4 font-medium">{r.name}</td>
-                        <td className="py-2 pr-4">{r.matches}</td>
-                        <td className="py-2 pr-4 text-red-600 font-medium">{r.redMatches}</td>
-                        <td className="py-2 pr-4 text-blue-600 font-medium">{r.blueMatches}</td>
-                        <td className="py-2 pr-4">{r.avgMinutes} min</td>
-                        <td className="py-2 pr-4 text-muted-foreground">{r.minMinutes}-{r.maxMinutes} min</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+          <Collapsible open={isStatsExpanded} onOpenChange={setIsStatsExpanded}>
+            <CollapsibleTrigger asChild>
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Info className="h-5 w-5" />
+                        <CardTitle>Schedule Statistics</CardTitle>
+                      </div>
+                      {!isStatsExpanded && (
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>{stats.totalMatches} matches</span>
+                          <span>•</span>
+                          <span>{stats.totalRounds} rounds</span>
+                          <span>•</span>
+                          <span>{stats.avgMatchesPerAlliance.toFixed(1)} avg/alliance</span>
+                        </div>
+                      )}
+                    </div>
+                    {isStatsExpanded ? (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Card className="mt-2">
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{stats.totalMatches}</div>
+                      <div className="text-sm text-muted-foreground">Total Matches</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{stats.totalRounds}</div>
+                      <div className="text-sm text-muted-foreground">Total Rounds</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">{Math.floor(stats.totalMatches / stats.totalRounds)}</div>
+                      <div className="text-sm text-muted-foreground">Matches per Round</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">{stats.avgMatchesPerAlliance.toFixed(1)}</div>
+                      <div className="text-sm text-muted-foreground">Avg per Alliance</div>
+                    </div>
+                  </div>
+                  
+                  <ScrollArea className="h-64">
+                    <table className="w-full text-sm">
+                      <thead className="text-left">
+                        <tr className="border-b">
+                          <th className="py-2 pr-4 font-medium">Alliance</th>
+                          <th className="py-2 pr-4 font-medium">Matches</th>
+                          <th className="py-2 pr-4 font-medium text-red-600">Red</th>
+                          <th className="py-2 pr-4 font-medium text-blue-600">Blue</th>
+                          <th className="py-2 pr-4 font-medium">Avg Turnaround</th>
+                          <th className="py-2 pr-4 font-medium">Range</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.rows.map((r) => (
+                          <tr key={r.id} className="border-b hover:bg-muted/50">
+                            <td className="py-2 pr-4 font-medium">{r.name}</td>
+                            <td className="py-2 pr-4">{r.matches}</td>
+                            <td className="py-2 pr-4 text-red-600 font-medium">{r.redMatches}</td>
+                            <td className="py-2 pr-4 text-blue-600 font-medium">{r.blueMatches}</td>
+                            <td className="py-2 pr-4">{r.avgMinutes} min</td>
+                            <td className="py-2 pr-4 text-muted-foreground">{r.minMinutes}-{r.maxMinutes} min</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* Main Content Tabs */}

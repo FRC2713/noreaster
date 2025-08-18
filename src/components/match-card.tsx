@@ -42,6 +42,7 @@ export function MatchCard({
   blueScore,
   matchNumber,
   round,
+  matchId,
 }: {
   title?: string;
   scheduledAt?: string | null;
@@ -54,6 +55,7 @@ export function MatchCard({
   blueScore?: number | null;
   matchNumber?: number;
   round?: number;
+  matchId?: string;
 }) {
   let timeLabel = "Unscheduled";
   if (scheduledAt) {
@@ -113,6 +115,9 @@ export function MatchCard({
         })()}
       </div>
       <div className="shrink-0 flex items-center gap-2">
+        {matchId && (
+          <Link to={`/matches/preview/${matchId}`} className="text-xs rounded px-2 py-1 border hover:bg-accent">Preview</Link>
+        )}
         {editHref && (
           <Link to={editHref} className="text-xs rounded px-2 py-1 border hover:bg-accent">Edit</Link>
         )}

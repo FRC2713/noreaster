@@ -107,7 +107,7 @@ export default function AllianceDetail() {
       setStatus("Saved.");
       setFile(null);
       void queryClient.invalidateQueries({ queryKey: ["alliances", "byId", allianceId] });
-      void queryClient.invalidateQueries({ queryKey: ["alliances", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["alliances", "polling"] });
     },
     onError: (e: unknown) => {
       const msg = e instanceof Error ? e.message : "Failed to save";

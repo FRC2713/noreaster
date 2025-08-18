@@ -48,6 +48,10 @@ const router = createBrowserRouter([
         lazy: () => import('./routes/matches.preview').then(m => ({ Component: m.default })),
       },
       {
+        path: 'matches/preview/:matchId',
+        lazy: () => import('./routes/match-preview').then(m => ({ Component: m.default })),
+      },
+      {
         path: 'matches/:matchId',
         lazy: () => import('./routes/match').then(m => ({ Component: m.default })),
       },

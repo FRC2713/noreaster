@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DndContext, useDroppable, useDraggable, rectIntersection } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { supabase } from "../supabase/client";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,23 +17,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-// Types
-interface Team {
-  id: string;
-  number: number;
-  name: string;
-  robot_image_url: string | null;
-}
-
-// AllianceTeam interface removed; hydrated via query results
-
-interface Alliance {
-  id: string;
-  name: string;
-  created_at?: string;
-  teams: (Team | null)[]; // length 4
-}
+import { useAlliancesStore } from "@/lib/alliances-store";
+import { useAlliancesPolling } from "@/lib/use-alliances-polling";
+import { AlliancesStatus } from "@/components/alliances-status";
 
 // DnD components
 function DroppableArea({ id, className, children }: { id: string; className?: string; children?: React.ReactNode }) {
@@ -44,7 +31,7 @@ function DroppableArea({ id, className, children }: { id: string; className?: st
   );
 }
 
-function DraggableTeamCard({ team }: { team: Team }) {
+function DraggableTeamCard({ team }: { team: { id: string; number: number; name: string; robot_image_url: string | null } }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `team:${team.id}` });
   const style = transform
     ? ({ transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } as React.CSSProperties)
@@ -70,84 +57,11 @@ function DraggableTeamCard({ team }: { team: Team }) {
 }
 
 export default function AlliancesRoute() {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [alliances, setAlliances] = useState<Alliance[]>([]);
-  const [schemaWarning, setSchemaWarning] = useState<string | null>(null);
+  const { alliances, teams, isLoading, error } = useAlliancesPolling();
+  const { getAvailableTeams, assignTeamToSlot, addAlliance, removeAlliance } = useAlliancesStore();
   const queryClient = useQueryClient();
 
-  const {
-    data: teamRows = [],
-    isLoading: teamsLoading,
-    error: teamsError,
-  } = useQuery({
-    queryKey: ["teams", "list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, number, name, robot_image_url");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const {
-    data: allianceRows = [],
-    isLoading: alliancesLoading,
-    error: alliancesError,
-  } = useQuery({
-    queryKey: ["alliances", "list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("alliances")
-        .select("id, name, created_at")
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const { data: allianceTeamsRows = [] } = useQuery({
-    queryKey: ["alliance_teams", "list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("alliance_teams")
-        .select("id, alliance_id, team_id, slot");
-      if (error) throw error;
-      return data ?? [];
-    },
-    // If the table is missing, the query will error; we handle schema warning below
-  });
-
-  useEffect(() => {
-    if (alliancesError) {
-      const msg = String((alliancesError as any)?.message ?? alliancesError);
-      if (msg.includes("relation") || msg.includes("42P01")) {
-        setSchemaWarning("Alliances tables missing. Create tables 'alliances' and 'alliance_teams' to enable persistence.");
-      }
-    }
-  }, [alliancesError]);
-
-  // Hydrate local state when queries resolve
-  useEffect(() => {
-    setTeams(teamRows);
-    const alliancesData: Alliance[] = (allianceRows as any[]).map((a: any) => ({
-      id: a.id,
-      name: a.name,
-      created_at: a.created_at,
-      teams: [null, null, null, null],
-    }));
-    const teamMap = new Map(teamRows.map((t) => [t.id, t]));
-    (allianceTeamsRows as any[]).forEach((at: any) => {
-      const idx = alliancesData.findIndex((a) => a.id === at.alliance_id);
-      if (idx !== -1 && at.slot >= 1 && at.slot <= 4) {
-        alliancesData[idx].teams[at.slot - 1] = teamMap.get(at.team_id) ?? null;
-      }
-    });
-    setAlliances(alliancesData);
-  }, [teamRows, allianceRows, allianceTeamsRows]);
-
-  const loading = teamsLoading || alliancesLoading;
-  const error = teamsError ? String(teamsError as any) : alliancesError ? String(alliancesError as any) : null;
+  const availableTeams = useMemo(() => getAvailableTeams(), [getAvailableTeams]);
 
   // Mutations
   const createAllianceMutation = useMutation({
@@ -161,11 +75,17 @@ export default function AlliancesRoute() {
       return data;
     },
     onSuccess: (data) => {
-      setAlliances((prev) => [...prev, { id: data.id, name: data.name, created_at: data.created_at, teams: [null, null, null, null] }]);
-      void queryClient.invalidateQueries({ queryKey: ["alliances", "list"] });
+      const newAlliance = { 
+        id: data.id, 
+        name: data.name, 
+        created_at: data.created_at, 
+        teams: [null, null, null, null] 
+      };
+      addAlliance(newAlliance);
+      void queryClient.invalidateQueries({ queryKey: ["alliances", "polling"] });
     },
     onError: () => {
-      setSchemaWarning("Failed to create alliance. Ensure table 'alliances' exists and RLS allows authenticated inserts.");
+      // Error handling is done by the store
     },
   });
 
@@ -177,12 +97,12 @@ export default function AlliancesRoute() {
       return id;
     },
     onSuccess: (id) => {
-      setAlliances((prev) => prev.filter((a) => a.id !== id));
-      void queryClient.invalidateQueries({ queryKey: ["alliances", "list"] });
-      void queryClient.invalidateQueries({ queryKey: ["alliance_teams", "list"] });
+      removeAlliance(id);
+      void queryClient.invalidateQueries({ queryKey: ["alliances", "polling"] });
+      void queryClient.invalidateQueries({ queryKey: ["alliance_teams", "polling"] });
     },
-    onError: (e: any) => {
-      setSchemaWarning("Failed to delete alliance. " + (e?.message ?? "Unknown error"));
+    onError: (e: Error) => {
+      // Error handling is done by the store
     },
   });
 
@@ -196,15 +116,9 @@ export default function AlliancesRoute() {
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["alliance_teams", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["alliance_teams", "polling"] });
     },
   });
-
-  const assignedTeamIds = useMemo(
-    () => new Set(alliances.flatMap((a) => a.teams.filter(Boolean).map((t) => (t as Team).id))),
-    [alliances]
-  );
-  const availableTeams = useMemo(() => teams.filter((t) => !assignedTeamIds.has(t.id)), [teams, assignedTeamIds]);
 
   function createAlliance() {
     const defaultName = `Alliance ${alliances.length + 1}`;
@@ -229,13 +143,7 @@ export default function AlliancesRoute() {
 
     // Dropping back to available pool
     if (overId === "available") {
-      setAlliances((prev) => {
-        const clone = structuredClone(prev) as Alliance[];
-        clone.forEach((a) => {
-          for (let i = 0; i < 4; i++) if (a.teams[i]?.id === teamId) a.teams[i] = null;
-        });
-        return clone;
-      });
+      assignTeamToSlot(teamId, null, null);
       void persistAssignment(teamId, null, null);
       return;
     }
@@ -247,23 +155,13 @@ export default function AlliancesRoute() {
       const slot = Number(parts[3] ?? "0");
       if (!allianceId || !(slot >= 1 && slot <= 4)) return;
 
-      setAlliances((prev) => {
-        const clone = structuredClone(prev) as Alliance[];
-        // Remove from any current slot
-        clone.forEach((a) => {
-          for (let i = 0; i < 4; i++) if (a.teams[i]?.id === teamId) a.teams[i] = null;
-        });
-        // If target slot occupied, move that team back to available by clearing
-        const idx = clone.findIndex((a) => a.id === allianceId);
-        if (idx !== -1) clone[idx].teams[slot - 1] = teams.find((t) => t.id === teamId) ?? null;
-        return clone;
-      });
+      assignTeamToSlot(teamId, allianceId, slot);
       void persistAssignment(teamId, allianceId, slot);
       return;
     }
   }
 
-  if (loading) return <p>Loading alliances...</p>;
+  if (isLoading) return <p>Loading alliances...</p>;
   if (error) return <p className="text-red-600">Error: {error}</p>;
 
   return (
@@ -272,17 +170,22 @@ export default function AlliancesRoute() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold">Teams</h2>
+            <AlliancesStatus />
           </div>
-          <DroppableArea id="available" className="min-h-[200px] rounded-md border p-3">
-            <div className="grid gap-3">
-              {availableTeams.map((t) => (
-                <DraggableTeamCard key={t.id} team={t} />
-              ))}
-              {availableTeams.length === 0 && (
-                <div className="text-sm text-muted-foreground">All teams are assigned.</div>
-              )}
-            </div>
-          </DroppableArea>
+          <Card>
+            <CardContent className="p-3">
+              <DroppableArea id="available" className="min-h-[200px] rounded-md border p-3">
+                <div className="grid gap-3">
+                  {availableTeams.map((t) => (
+                    <DraggableTeamCard key={t.id} team={t} />
+                  ))}
+                  {availableTeams.length === 0 && (
+                    <div className="text-sm text-muted-foreground">All teams are assigned.</div>
+                  )}
+                </div>
+              </DroppableArea>
+            </CardContent>
+          </Card>
         </div>
 
         <div>
@@ -290,57 +193,58 @@ export default function AlliancesRoute() {
             <h2 className="text-xl font-semibold">Alliances</h2>
             <Button onClick={createAlliance}>New Alliance</Button>
           </div>
-          {schemaWarning && (
-            <div className="mb-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-              {schemaWarning}
-            </div>
-          )}
           <div className="grid gap-4">
             {alliances.length === 0 && (
               <div className="text-sm text-muted-foreground">No alliances yet. Create one to begin.</div>
             )}
-            {alliances.map((a) => (
-              <div key={a.id} className="rounded-md border">
-                <div className="px-3 py-2 border-b font-medium flex items-center justify-between gap-3">
-                  <Link to={`/alliances/${a.id}`} className="hover:underline">{a.name}</Link>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="sm">Delete</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete {a.name}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will remove the alliance and unassign its teams. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteAlliance(a.id)}>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-                <div className="grid grid-cols-2 gap-3 p-3">
-                  {a.teams.map((t, idx) => (
-                    <DroppableArea
-                      key={`${a.id}:${idx + 1}`}
-                      id={`alliance:${a.id}:slot:${idx + 1}`}
-                      className="min-h-24 rounded-md border bg-muted/30 grid place-items-center"
-                    >
-                      <div className="h-full w-full grid place-items-center">
-                        {t ? (
-                          <DraggableTeamCard team={t} />
-                        ) : (
-                          <div className="h-full w-full grid place-items-center text-xs text-muted-foreground">
-                            Slot {idx + 1}
-                          </div>
-                        )}
-                      </div>
-                    </DroppableArea>
-                  ))}
-                </div>
-              </div>
+            {alliances.map((a: { id: string; name: string; created_at?: string; teams: ({ id: string; number: number; name: string; robot_image_url: string | null } | null)[] }) => (
+              <Card key={a.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-base">
+                      <Link to={`/alliances/${a.id}`} className="hover:underline">{a.name}</Link>
+                    </CardTitle>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">Delete</Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {a.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will remove the alliance and unassign its teams. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteAlliance(a.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-2 gap-3">
+                    {a.teams.map((t: { id: string; number: number; name: string; robot_image_url: string | null } | null, idx: number) => (
+                      <DroppableArea
+                        key={`${a.id}:${idx + 1}`}
+                        id={`alliance:${a.id}:slot:${idx + 1}`}
+                        className="min-h-24 rounded-md border bg-muted/30 grid place-items-center"
+                      >
+                        <div className="h-full w-full grid place-items-center">
+                          {t ? (
+                            <DraggableTeamCard team={t} />
+                          ) : (
+                            <div className="h-full w-full grid place-items-center text-xs text-muted-foreground">
+                              Slot {idx + 1}
+                            </div>
+                          )}
+                        </div>
+                      </DroppableArea>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
