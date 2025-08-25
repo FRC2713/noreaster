@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/supabase/client";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import type { RobotImageTeam } from "@/types";
 
-export type RobotImageTeam = {
-  id: string;
-  number: number;
-  name: string;
-  robot_image_url: string | null;
-};
+// Cache for signed URLs with expiration tracking
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 function deriveRobotsPath(publicUrl: string) {
   const marker = "/robots/";
@@ -16,10 +13,39 @@ function deriveRobotsPath(publicUrl: string) {
   return publicUrl.slice(idx + marker.length);
 }
 
+async function getSignedUrl(robotImageUrl: string): Promise<string | null> {
+  const path = deriveRobotsPath(robotImageUrl);
+  if (!path) return robotImageUrl;
+
+  // Check if we have a cached URL that's still valid
+  const cached = signedUrlCache.get(robotImageUrl);
+  const now = Date.now();
+  
+  if (cached && cached.expiresAt > now + 60000) { // 1 minute buffer
+    return cached.url;
+  }
+
+  try {
+    const { data } = await supabase.storage.from("robots").createSignedUrl(path, 60 * 60);
+    if (data?.signedUrl) {
+      // Cache the new signed URL with expiration time
+      signedUrlCache.set(robotImageUrl, {
+        url: data.signedUrl,
+        expiresAt: now + (60 * 60 * 1000) // 1 hour from now
+      });
+      return data.signedUrl;
+    }
+  } catch (error) {
+    console.warn('Failed to generate signed URL:', error);
+  }
+  
+  return robotImageUrl;
+}
+
 export function RobotImage({
   team,
   className,
-  ratio = 16/9,
+  ratio = 1,
 }: {
   team: RobotImageTeam;
   className?: string;
@@ -35,12 +61,10 @@ export function RobotImage({
         setSrc(null);
         return;
       }
-      const path = deriveRobotsPath(raw);
-      if (path) {
-        const { data } = await supabase.storage.from("robots").createSignedUrl(path, 60 * 60);
-        if (!cancelled) setSrc(data?.signedUrl ?? raw);
-      } else {
-        setSrc(raw);
+      
+      const signedUrl = await getSignedUrl(raw);
+      if (!cancelled) {
+        setSrc(signedUrl);
       }
     })();
     return () => {

@@ -1,7 +1,7 @@
-import { useMatchesStore } from "@/lib/matches-store";
+import { useMatchesPolling } from "@/lib/use-matches-polling";
 
 export function MatchesStatus() {
-  const { lastUpdated, isLoading, error } = useMatchesStore();
+  const { lastUpdated, isLoading, error } = useMatchesPolling();
 
   if (error) {
     return (

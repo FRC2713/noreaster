@@ -1,30 +1,14 @@
 import { Link, Outlet, useNavigate } from "react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "./supabase/client";
+import { useAuth } from "./lib/use-auth";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { User as UserIcon } from "lucide-react";
 
 function AppLayout() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<null | { id: string; email?: string }>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (isMounted) setUser(data.user ? { id: data.user.id, email: data.user.email ?? undefined } : null);
-    })();
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null);
-    });
-    return () => {
-      isMounted = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
+  const { user, signOut } = useAuth();
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/");
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { supabase } from "../supabase/client";
 import { RobotImage } from "@/components/robot-image";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../lib/use-auth";
 
 type Team = {
   id: string;
@@ -15,8 +16,22 @@ type Team = {
   robot_image_url: string | null;
 };
 
+type Alliance = {
+  id: string;
+  name: string;
+  emblem_image_url: string | null;
+  created_at: string;
+};
+
+type AllianceTeam = {
+  team_id: string;
+  slot: number;
+};
+
 export default function AllianceDetail() {
   const { allianceId } = useParams();
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [name, setName] = useState<string>("");
   const [teams, setTeams] = useState<(Team | null)[]>([null, null, null, null]);
   const [file, setFile] = useState<File | null>(null);
@@ -24,10 +39,17 @@ export default function AllianceDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const queryClient = useQueryClient();
 
+  // Redirect to auth if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
   const { data: allianceRow, isLoading: aLoading, error: aError } = useQuery({
     queryKey: ["alliances", "byId", allianceId],
-    queryFn: async () => {
-      if (!allianceId) return null as any;
+    queryFn: async (): Promise<Alliance | null> => {
+      if (!allianceId) return null;
       const { data, error } = await supabase
         .from("alliances")
         .select("id, name, emblem_image_url, created_at")
@@ -40,8 +62,8 @@ export default function AllianceDetail() {
 
   const { data: ats = [], isLoading: atsLoading, error: atsError } = useQuery({
     queryKey: ["alliance_teams", "byAlliance", allianceId],
-    queryFn: async () => {
-      if (!allianceId) return [] as any[];
+    queryFn: async (): Promise<AllianceTeam[]> => {
+      if (!allianceId) return [];
       const { data, error } = await supabase
         .from("alliance_teams")
         .select("team_id, slot")
@@ -52,11 +74,11 @@ export default function AllianceDetail() {
     },
   });
 
-  const teamIds = (ats ?? []).map((r: any) => r.team_id);
+  const teamIds = (ats ?? []).map((r: AllianceTeam) => r.team_id);
   const { data: teamRows = [], isLoading: tLoading, error: tError } = useQuery({
     queryKey: ["teams", "byIds", teamIds.sort().join(",")],
-    queryFn: async () => {
-      if (!teamIds.length) return [] as any[];
+    queryFn: async (): Promise<Team[]> => {
+      if (!teamIds.length) return [];
       const { data, error } = await supabase
         .from("teams")
         .select("id, number, name, robot_image_url")
@@ -69,9 +91,9 @@ export default function AllianceDetail() {
 
   useEffect(() => {
     if (allianceRow) setName(allianceRow.name ?? "");
-    const map = new Map((teamRows ?? []).map((t: any) => [t.id, t]));
+    const map = new Map((teamRows ?? []).map((t: Team) => [t.id, t]));
     const slots: (Team | null)[] = [null, null, null, null];
-    (ats ?? []).forEach((r: any) => {
+    (ats ?? []).forEach((r: AllianceTeam) => {
       if (r.slot >= 1 && r.slot <= 4) slots[r.slot - 1] = map.get(r.team_id) ?? null;
     });
     setTeams(slots);
@@ -79,17 +101,28 @@ export default function AllianceDetail() {
 
   const previewSrc = useMemo(() => {
     if (file) return URL.createObjectURL(file);
-    return (allianceRow as any)?.emblem_image_url ?? null;
+    return allianceRow?.emblem_image_url ?? null;
   }, [file, allianceRow]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!allianceId) return;
+      if (!user) {
+        throw new Error("You must be signed in to save changes");
+      }
+      
       setStatus(null);
-      let emblemUrl: string | null = (allianceRow as any)?.emblem_image_url ?? null;
+      
+      // Verify authentication before proceeding
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !currentUser) {
+        throw new Error("Authentication failed. Please sign in again.");
+      }
+      
+      let emblemUrl: string | null = allianceRow?.emblem_image_url ?? null;
       if (file) {
         const ext = (file.name.split(".").pop() || "png").toLowerCase();
-        const objectPath = `emblems/${Date.now()}_${Math.random().toString(16).slice(2, 8)}.${ext}`;
+        const objectPath = `images/${Date.now()}_${Math.random().toString(16).slice(2, 8)}.${ext}`;
         const { error: uploadError } = await supabase.storage
           .from("alliances")
           .upload(objectPath, file, { cacheControl: "3600", upsert: false, contentType: file.type });
@@ -117,6 +150,8 @@ export default function AllianceDetail() {
   });
 
   if (!allianceId) return <p>Missing alliance id</p>;
+  if (authLoading) return <p>Checking authentication...</p>;
+  if (!user) return <p>Redirecting to sign in...</p>;
   if (aLoading || atsLoading || tLoading) return <p>Loading alliance...</p>;
   const error = aError || atsError || tError;
   if (error) return <p className="text-red-600">Error: {String(error)}</p>;
@@ -128,6 +163,21 @@ export default function AllianceDetail() {
           <Button variant="ghost">← Back</Button>
         </Link>
         <h1 className="text-2xl font-semibold">Alliance</h1>
+        <div className="ml-auto flex items-center gap-3">
+          <Button 
+            variant="destructive" 
+            onClick={() => {
+              if (confirm(`Are you sure you want to delete "${allianceRow?.name}"? This will remove the alliance and unassign its teams. This action cannot be undone.`)) {
+                // Delete alliance logic
+                supabase.from("alliance_teams").delete().eq("alliance_id", allianceId);
+                supabase.from("alliances").delete().eq("id", allianceId);
+                navigate("/alliances");
+              }
+            }}
+          >
+            Delete Alliance
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[220px_1fr]">

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "../supabase/client";
 import { AllianceRPToggles } from "@/components/alliance-rp-toggles";
 import { useAlliancesPolling } from "@/lib/use-alliances-polling";
-import { useMatchesStore } from "@/lib/matches-store";
+import { useMatch } from "@/lib/use-match";
 
 type MatchRow = {
   id: string;
@@ -23,32 +23,22 @@ type MatchRow = {
   blue_barge_rp: boolean;
 };
 
-async function fetchMatch(id: string): Promise<MatchRow> {
-  const { data, error } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) throw error;
-  return data ?? [];
-}
-
 export default function MatchEditRoute() {
   const { matchId } = useParams();
   const queryClient = useQueryClient();
   const { alliances } = useAlliancesPolling();
-  const { getMatchById } = useMatchesStore();
+  const { data: currentMatch, isLoading, error } = useMatch(matchId!);
 
   // Get match from store if available, otherwise fetch from API
-  const match = matchId ? getMatchById(matchId) : undefined;
-  const { data: apiMatch, isLoading, error } = useQuery({
-    queryKey: ["matches", "byId", matchId],
-    queryFn: async () => fetchMatch(matchId!),
-    enabled: !!matchId && !match, // Only fetch if not in store
-  });
+  // const match = matchId ? getMatchById(matchId) : undefined;
+  // const { data: apiMatch, isLoading, error } = useQuery({
+  //   queryKey: ["matches", "byId", matchId],
+  //   queryFn: async () => fetchMatch(matchId!),
+  //   enabled: !!matchId && !match, // Only fetch if not in store
+  // });
 
   // Use store match if available, otherwise use API match
-  const currentMatch = match || apiMatch;
+  // const currentMatch = match || apiMatch;
 
   const [redScore, setRedScore] = useState<string>("");
   const [blueScore, setBlueScore] = useState<string>("");

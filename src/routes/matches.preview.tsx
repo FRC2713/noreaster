@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../supabase/client";
 import { RobotImage } from "@/components/robot-image";
-import { useMatchesStore } from "@/lib/matches-store";
+import { useMatchesPolling } from "@/lib/use-matches-polling";
 
 type Team = {
   id: string;
@@ -53,10 +53,15 @@ async function fetchTeams(teamIds: string[]): Promise<Team[]> {
 }
 
 export default function MatchesPreviewRoute() {
-  const { getUpcomingMatches, isLoading: matchesLoading, error: matchesError } = useMatchesStore();
+  const { matches, isLoading: matchesLoading, error: matchesError } = useMatchesPolling();
   
-  // Get the next unplayed match from the store
-  const upcomingMatches = getUpcomingMatches();
+  // Get the next unplayed match from the query
+  const upcomingMatches = matches.filter((m) => m.red_score == null && m.blue_score == null);
+  upcomingMatches.sort((a, b) => {
+    const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Number.NEGATIVE_INFINITY;
+    const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Number.NEGATIVE_INFINITY;
+    return ta - tb;
+  });
   const match = upcomingMatches.length > 0 ? upcomingMatches[0] : null;
 
   const allianceIds = useMemo(() => {
@@ -107,68 +112,63 @@ export default function MatchesPreviewRoute() {
   if (!match) return <p className="text-muted-foreground">No unplayed matches.</p>;
 
   return (
-    <div className="min-h-dvh w-full p-4 md:p-8 lg:p-10">
-      <div className="text-center mb-6">
-        <div className="text-2xl md:text-3xl opacity-70">Up Next</div>
-        <div className="text-3xl md:text-5xl font-bold">
-          {allianceNames[match.red_alliance_id] ?? "Red Alliance"} vs {allianceNames[match.blue_alliance_id] ?? "Blue Alliance"}
-        </div>
-        {match.scheduled_at && (
-          <div className="text-lg md:text-2xl opacity-70 mt-2">{new Date(match.scheduled_at).toLocaleTimeString()}</div>
-        )}
-      </div>
+    <div className="fixed inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/80 flex flex-col justify-end">
+      
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Red side */}
-        <div>
-          <div className="text-3xl md:text-4xl font-bold mb-4 text-white bg-red-600 inline-block px-4 py-1 rounded">
-            {allianceNames[match.red_alliance_id] ?? "Red Alliance"}
-          </div>
-          <ul className="grid gap-4">
-            {redSlots.map((t, idx) => (
-              <li key={`r-${idx}`} className="border rounded-md overflow-hidden">
-                <div className="grid grid-cols-[240px_1fr] items-center">
-                  <RobotImage team={t ?? ({ id: "_", number: 0, name: "Unassigned", robot_image_url: null } as Team)} className="w-full bg-muted" ratio={16/9} />
-                  <div className="p-4 text-2xl md:text-3xl font-semibold">
-                    {t ? (
-                      <>
-                        <div>#{t.number}</div>
-                        <div className="text-xl md:text-2xl opacity-80 font-normal">{t.name}</div>
-                      </>
-                    ) : (
-                      <div className="text-muted-foreground">Unassigned</div>
+      {/* Alliances in Lower Third */}
+      <div className="bg-black/70 backdrop-blur-sm border-t-2 border-white/20">
+        <div className="container mx-auto px-8 py-6">
+          <div className="grid grid-cols-2 gap-16">
+            {/* Red Alliance */}
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold mb-6 text-white bg-red-600/90 px-6 py-2 rounded-lg inline-block">
+                {allianceNames[match.red_alliance_id] ?? "Red Alliance"}
+              </div>
+              <div className="flex justify-center gap-4">
+                {redSlots.map((t, idx) => (
+                  <div key={`r-${idx}`} className="text-center">
+                    <div className="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 mx-auto mb-2">
+                      <RobotImage 
+                        team={t ?? ({ id: "_", number: 0, name: "Unassigned", robot_image_url: null } as Team)} 
+                        className="w-full h-full bg-muted rounded-lg" 
+                        ratio={1}
+                      />
+                    </div>
+                    {t && (
+                      <div className="text-lg md:text-xl font-semibold text-white drop-shadow-lg">
+                        {t.number}
+                      </div>
                     )}
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+                ))}
+              </div>
+            </div>
 
-        {/* Blue side */}
-        <div className="text-right">
-          <div className="text-3xl md:text-4xl font-bold mb-4 text-white bg-blue-600 inline-block px-4 py-1 rounded">
-            {allianceNames[match.blue_alliance_id] ?? "Blue Alliance"}
-          </div>
-          <ul className="grid gap-4">
-            {blueSlots.map((t, idx) => (
-              <li key={`b-${idx}`} className="border rounded-md overflow-hidden">
-                <div className="grid grid-cols-[1fr_240px] items-center">
-                  <div className="p-4 text-2xl md:text-3xl font-semibold text-right">
-                    {t ? (
-                      <>
-                        <div>#{t.number}</div>
-                        <div className="text-xl md:text-2xl opacity-80 font-normal">{t.name}</div>
-                      </>
-                    ) : (
-                      <div className="text-muted-foreground">Unassigned</div>
+            {/* Blue Alliance */}
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold mb-6 text-white bg-blue-600/90 px-6 py-2 rounded-lg inline-block">
+                {allianceNames[match.blue_alliance_id] ?? "Blue Alliance"}
+              </div>
+              <div className="flex justify-center gap-4">
+                {blueSlots.map((t, idx) => (
+                  <div key={`b-${idx}`} className="text-center">
+                    <div className="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 mx-auto mb-2">
+                      <RobotImage 
+                        team={t ?? ({ id: "_", number: 0, name: "Unassigned", robot_image_url: null } as Team)} 
+                        className="w-full h-full bg-muted rounded-lg" 
+                        ratio={1}
+                      />
+                    </div>
+                    {t && (
+                      <div className="text-lg md:text-xl font-semibold text-white drop-shadow-lg">
+                        {t.number}
+                      </div>
                     )}
                   </div>
-                  <RobotImage team={t ?? ({ id: "_", number: 0, name: "Unassigned", robot_image_url: null } as Team)} className="w-full bg-muted" ratio={16/9} />
-                </div>
-              </li>
-            ))}
-          </ul>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

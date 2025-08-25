@@ -1,5 +1,6 @@
 import type { HTMLAttributes } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { RobotImage } from "@/components/robot-image";
 
 export type Team = {
@@ -11,11 +12,42 @@ export type Team = {
 
 export function TeamCard({ team, className, ...props }: { team: Team } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <Card className={className} {...props}>
-      <RobotImage team={team} className="w-full bg-muted" />
-      <CardContent className="p-4">
-        <div className="text-lg font-medium">{team.number}</div>
-        <div className="text-sm opacity-80">{team.name}</div>
+    <Card 
+      className={`group overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${className}`} 
+      {...props}
+    >
+      {/* Robot Image Section - Prominently Displayed */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950/20 dark:to-indigo-950/20">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-10" />
+        <RobotImage 
+          team={team} 
+          className="w-full aspect-square object-contain transition-transform duration-500 group-hover:scale-110" 
+        />
+        
+        {/* Team Number Badge Overlay */}
+        <div className="absolute top-3 left-3 z-20">
+          <Badge className="bg-primary/90 text-primary-foreground font-bold text-lg px-3 py-1">
+            {team.number}
+          </Badge>
+        </div>        
+       
+      </div>
+
+      {/* Team Information Section */}
+      <CardContent className="p-5">
+        <div className="space-y-3">
+          {/* Team Name */}
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+              {team.name || `Team ${team.number}`}
+            </h3>
+            {team.name && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Team {team.number}
+              </p>
+            )}
+          </div>          
+        </div>
       </CardContent>
     </Card>
   );

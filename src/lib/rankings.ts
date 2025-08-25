@@ -1,18 +1,19 @@
-import type { RankingRow } from "@/components/rankings-table";
+import type { AllianceLite, MatchLite } from '@/types';
 
-export type AllianceLite = { id: string; name: string };
-export type MatchLite = {
-  red_alliance_id: string;
-  blue_alliance_id: string;
-  red_score: number | null;
-  blue_score: number | null;
-  red_coral_rp: boolean;
-  red_auto_rp: boolean;
-  red_barge_rp: boolean;
-  blue_coral_rp: boolean;
-  blue_auto_rp: boolean;
-  blue_barge_rp: boolean;
-};
+export type { AllianceLite, MatchLite };
+
+export interface RankingRow {
+  id: string;
+  name: string;
+  emblem_image_url: string | null;
+  played: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  avgRp: number;
+  avgScore: number;
+  rank: number;
+}
 
 export function computeRankings(
   alliances: AllianceLite[],
@@ -23,6 +24,7 @@ export function computeRankings(
   const idToStats = new Map<string, {
     id: string;
     name: string;
+    emblem_image_url: string | null;
     played: number;
     wins: number;
     losses: number;
@@ -36,6 +38,7 @@ export function computeRankings(
     idToStats.set(a.id, {
       id: a.id,
       name: a.name,
+      emblem_image_url: a.emblem_image_url,
       played: 0,
       wins: 0,
       losses: 0,
@@ -112,6 +115,7 @@ export function computeRankings(
   return statsArray.map((s, idx) => ({
     id: s.id,
     name: s.name,
+    emblem_image_url: s.emblem_image_url,
     played: s.played,
     wins: s.wins,
     losses: s.losses,

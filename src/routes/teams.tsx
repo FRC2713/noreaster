@@ -20,6 +20,17 @@ export default function Component() {
     },
   });
 
+  // Get user authentication status
+  const { data: authData } = useQuery({
+    queryKey: ["auth", "user"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return { user };
+    },
+  });
+
+  const user = authData?.user;
+
   if (isLoading) return <p>Loading teams...</p>;
   if (error) return <p className="text-red-600">Error: {String(error)}</p>;
 
@@ -27,7 +38,9 @@ export default function Component() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Teams</h1>
-        <Link to="/teams/new"><Button>New Team</Button></Link>
+        {user && (
+          <Link to="/teams/new"><Button>New Team</Button></Link>
+        )}
       </div>
       {teams.length === 0 ? (
         <p className="text-muted-foreground">No teams yet.</p>

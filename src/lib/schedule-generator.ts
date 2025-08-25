@@ -1,30 +1,9 @@
 import { v4 } from "uuid";
+import type { GeneratedMatch, RoundRobinRound, LunchBreak, ScheduleBlock } from '@/types';
+
+export type { GeneratedMatch, RoundRobinRound, LunchBreak, ScheduleBlock };
 
 export type Alliance = { id: string; name: string };
-
-export type LunchBreak = {
-  type: "lunch";
-  duration: number;
-};
-
-export type RoundRobinRound = {
-  type: "matches";
-  matches: GeneratedMatch[];
-  round: number;
-};
-
-export type GeneratedMatch = {
-  id: string;
-  red_alliance_id: string;
-  blue_alliance_id: string;
-  scheduled_at: Date;
-  round: number;
-};
-
-export type ScheduleBlock<T extends RoundRobinRound | LunchBreak> = {
-  startTime: string;
-  activity: T;
-};
 
 export type ScheduleConfig = {
   day: Date;

@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { supabase } from '../supabase/client';
-import { useMatchesStore } from './matches-store';
 
 async function fetchMatches() {
   const { data, error } = await supabase
@@ -32,8 +30,6 @@ async function fetchMatches() {
 }
 
 export function useMatchesPolling() {
-  const { setMatches, setLoading, setError, setLastUpdated } = useMatchesStore();
-
   const { data: matches = [], isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['matches', 'polling'],
     queryFn: fetchMatches,
@@ -42,29 +38,6 @@ export function useMatchesPolling() {
     staleTime: 0, // Always consider data stale to ensure polling
     gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
   });
-
-  // Update the Zustand store when TanStack Query data changes
-  useEffect(() => {
-    if (matches.length > 0) {
-      setMatches(matches);
-      setLastUpdated(new Date(dataUpdatedAt));
-      console.log(`[Matches Store] Updated with ${matches.length} matches at ${new Date().toLocaleTimeString()}`);
-    }
-  }, [matches, dataUpdatedAt, setMatches, setLastUpdated]);
-
-  useEffect(() => {
-    setLoading(isLoading);
-  }, [isLoading, setLoading]);
-
-  useEffect(() => {
-    if (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch matches';
-      setError(errorMessage);
-      console.error('[Matches Store] Error fetching matches:', error);
-    } else {
-      setError(null);
-    }
-  }, [error, setError]);
 
   return {
     matches,

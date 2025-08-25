@@ -1,7 +1,7 @@
-import { useAlliancesStore } from "@/lib/alliances-store";
+import { useAlliancesPolling } from "@/lib/use-alliances-polling";
 
 export function AlliancesStatus() {
-  const { lastUpdated, isLoading, error } = useAlliancesStore();
+  const { lastUpdated, isLoading, error } = useAlliancesPolling();
 
   if (error) {
     return (

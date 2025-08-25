@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Settings, Save, Trash2, Play, Info } from "lucide-react";
@@ -20,7 +20,6 @@ import { formatTime } from "@/lib/utils";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAlliancesPolling } from "@/lib/use-alliances-polling";
 import { useMatchesPolling } from "@/lib/use-matches-polling";
-
 
 // Type for database schedule records
 type ScheduleRecord = {
@@ -38,7 +37,7 @@ type ScheduleRecord = {
 // Type for database match records
 type MatchRecord = {
   id: string;
-  name: string | null;
+  name: string | null; 
   red_alliance_id: string;
   blue_alliance_id: string;
   scheduled_at: string | null;
@@ -98,16 +97,17 @@ function transformScheduleData(
         },
       };
     } else {
-      // Handle other types or fallback
+      // Unknown type, return as generic block
       return {
         startTime: record.start_time,
         activity: {
-          type: "lunch" as const,
-          duration: 60,
+          type: "matches" as const,
+          matches: [],
+          round: 0,
         },
       };
     }
-  }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  });
 }
 
 const DEFAULT_SETTINGS = {
@@ -118,10 +118,20 @@ const DEFAULT_SETTINGS = {
   lunchDurationMin: 60,
 };
 
-
 export default function ScheduleRoute() {
   const [status, setStatus] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Get user authentication status
+  const { data: authData } = useQuery({
+    queryKey: ["auth", "user"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return { user };
+    },
+  });
+
+  const user = authData?.user;
 
   // Single-day schedule controls
   const [day, setDay] = useState<Date>(DEFAULT_SETTINGS.day);
@@ -131,24 +141,27 @@ export default function ScheduleRoute() {
   const [lunchDurationMin, setLunchDurationMin] = useState(DEFAULT_SETTINGS.lunchDurationMin);
   const [generatedBlocks, setGeneratedBlocks] = useState<ScheduleBlock<RoundRobinRound | LunchBreak>[]>([]);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
-  const [isStatsExpanded, setIsStatsExpanded] = useState(false);
 
   const { alliances } = useAlliancesPolling();
   const { matches: existingMatches } = useMatchesPolling();
 
   // Load existing schedule from database
-  const { data: existingSchedule = [], isLoading: scheduleLoading } = useQuery({
+  const { data: existingSchedule = [], isLoading: scheduleLoading, error: scheduleError } = useQuery({
     queryKey: ["schedule", "list"],
     queryFn: async () => {
       const { data, error } = await supabase.from("schedule").select("*").order("start_time");
-      if (error) throw error;
+      if (error) {
+        console.error("Schedule query error:", error);
+        throw error;
+      }
+      console.log("Schedule data loaded:", data?.length || 0, "records");
       return (data ?? []) as ScheduleRecord[];
     },
   });
 
   // Transform database data to ScheduleBlock format
   const transformedExistingSchedule = useMemo(() => {
-    if (existingSchedule.length === 0 || existingMatches.length === 0) return [];
+    if (existingSchedule.length === 0) return [];
     
     // Transform store matches to MatchRecord format
     const transformedMatches: MatchRecord[] = existingMatches.map(match => ({
@@ -172,7 +185,7 @@ export default function ScheduleRoute() {
   }, [existingSchedule, existingMatches]);
 
   // Check if there's existing data to display
-  const hasExistingData = existingSchedule.length > 0 || existingMatches.length > 0;
+  const hasExistingData = existingSchedule.length > 0;
 
   function generate() {
     setStatus(null);
@@ -227,6 +240,8 @@ export default function ScheduleRoute() {
   function save() {
     if (generatedMatchesData.length === 0) return;
     
+    setStatus("Saving schedule to database...");
+    
     // Save matches first to get their IDs
     const matchesPayload: Omit<MatchRecord, "created_at">[] = generatedMatchesData.map((m, idx) => ({
       id: m.id,
@@ -246,57 +261,79 @@ export default function ScheduleRoute() {
     
     // Save matches first, then use the returned IDs for schedule blocks
     saveMatches.mutateAsync(matchesPayload).then(() => {
-     
       // Save schedule blocks with match IDs
-      const schedulePayload = generatedBlocks.map((block) => {
+      const scheduleBlocks = generatedBlocks.map((block, blockIndex) => {
         if (block.activity.type === "matches") {
-          // Get all match IDs for this block
-          const blockMatchIds = block.activity.matches.map(match => match.id);
+          const startMatchIndex = blockIndex === 0 ? 0 : generatedBlocks
+            .slice(0, blockIndex)
+            .filter((b): b is ScheduleBlock<RoundRobinRound> => b.activity.type === "matches")
+            .reduce((acc, b) => acc + b.activity.matches.length, 0);
+          
+          const matchIds = generatedMatchesData
+            .slice(startMatchIndex, startMatchIndex + block.activity.matches.length)
+            .map(m => m.id);
           
           return {
             start_time: block.startTime,
-            end_time: null, // Could calculate based on match duration if needed
-            name: `Round ${(block.activity as RoundRobinRound).round + 1}`,
-            description: `Round ${(block.activity as RoundRobinRound).round + 1} with ${block.activity.matches.length} matches`,
+            end_time: null,
+            name: `Round ${block.activity.round + 1}`,
+            description: `${block.activity.matches.length} matches`,
             type: "match",
-            match_ids: blockMatchIds
+            match_ids: matchIds,
           };
         } else {
+          const endTime = new Date(block.startTime);
+          endTime.setMinutes(endTime.getMinutes() + block.activity.duration);
+          
           return {
             start_time: block.startTime,
-            end_time: new Date(new Date(block.startTime).getTime() + block.activity.duration * 60000).toISOString(),
+            end_time: endTime.toISOString(),
             name: "Lunch Break",
-            description: `${block.activity.duration} minute lunch break`,
+            description: `${block.activity.duration} minutes`,
             type: "lunch_break",
-            match_ids: [] // No matches for lunch breaks
+            match_ids: null,
           };
         }
       });
       
       // Save schedule blocks
-      return supabase.from("schedule").insert(schedulePayload);
-    }).then((scheduleResult) => {
-      if (scheduleResult.error) {
-        setStatus(`Matches saved, but schedule save failed: ${scheduleResult.error.message}`);
-      } else {
-        setStatus(`Saved ${matchesPayload.length} matches and ${generatedBlocks.length} schedule blocks with match IDs.`);
-      }
-      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
-      void queryClient.invalidateQueries({ queryKey: ["schedule", "list"] });
+      supabase.from("schedule").insert(scheduleBlocks).then(({ error }) => {
+        if (error) {
+          setStatus(`❌ Failed to save schedule: ${error.message}`);
+        } else {
+          setStatus("✅ Schedule saved successfully! You can now view it in the Existing Schedule tab.");
+          void queryClient.invalidateQueries({ queryKey: ["schedule", "list"] });
+        }
+      });
     }).catch((error) => {
-      setStatus(`Save failed: ${error?.message ?? "Unknown error"}`);
+      setStatus(`❌ Failed to save matches: ${error.message || 'Unknown error'}`);
     });
   }
 
-  const stats = useMemo(() => {
-    return calculateScheduleStats(generatedMatchesData, alliances);
-  }, [generatedMatchesData, alliances]);
+  const clearAllScheduleData = useMutation({
+    mutationFn: async () => {
+      // Clear schedule first
+      const { error: scheduleError } = await supabase.from("schedule").delete().gte("id", "00000000-0000-0000-0000-000000000000");
+      if (scheduleError) throw scheduleError;
+      
+      // Clear all matches
+      const { error: matchesError } = await supabase.from("matches").delete().gte("id", "00000000-0000-0000-0000-000000000000");
+      if (matchesError) throw matchesError;
+      
+      return true;
+    },
+    onSuccess: () => {
+      setStatus("All schedule data cleared.");
+      setGeneratedBlocks([]);
+      void queryClient.invalidateQueries({ queryKey: ["schedule", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
+    },
+    onError: (e: Error) => {
+      setStatus(`Clear failed: ${e?.message ?? "Unknown error"}`);
+    },
+  });
 
-  function allianceName(id: string) {
-    return alliances.find((a) => a.id === id)?.name ?? id;
-  }
-
-  const toggleRound = (roundIndex: number) => {
+  function toggleRound(roundIndex: number) {
     const newExpanded = new Set(expandedRounds);
     if (newExpanded.has(roundIndex)) {
       newExpanded.delete(roundIndex);
@@ -304,93 +341,38 @@ export default function ScheduleRoute() {
       newExpanded.add(roundIndex);
     }
     setExpandedRounds(newExpanded);
-  };
-
-  async function clearAllScheduleData() {
-    try {
-      setStatus("Clearing all schedule data...");
-      
-      // Delete all matches (using a condition that's always true)
-      const { error: deleteMatchesError } = await supabase
-        .from("matches")
-        .delete()
-        .gte("id", "00000000-0000-0000-0000-000000000000"); // This will match all UUIDs
-      
-      if (deleteMatchesError) {
-        setStatus(`Error deleting matches: ${deleteMatchesError.message}`);
-        return;
-      }
-      
-      // Delete all schedule blocks (using a condition that's always true)
-      const { error: deleteScheduleError } = await supabase
-        .from("schedule")
-        .delete()
-        .gte("id", "00000000-0000-0000-0000-000000000000"); // This will match all UUIDs
-      
-      if (deleteScheduleError) {
-        setStatus(`Error deleting schedule: ${deleteScheduleError.message}`);
-        return;
-      }
-      
-      // Clear local state
-      setGeneratedBlocks([]);
-      setExpandedRounds(new Set());
-      
-      setStatus("✅ All schedule data has been permanently deleted.");
-      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
-      void queryClient.invalidateQueries({ queryKey: ["schedule", "list"] });
-    } catch (error) {
-      setStatus(`Error during deletion: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
   }
 
-    return (
+  function allianceName(allianceId: string) {
+    return alliances.find(a => a.id === allianceId)?.name ?? `Alliance ${allianceId}`;
+  }
+
+  // Calculate stats for generated schedule
+  const stats = useMemo(() => {
+    if (generatedBlocks.length === 0) return null;
+    const matchBlocks = generatedBlocks.filter((block): block is ScheduleBlock<RoundRobinRound> => block.activity.type === "matches");
+    const matches = matchBlocks.flatMap(block => block.activity.matches);
+    return calculateScheduleStats(matches, alliances);
+  }, [generatedBlocks, alliances]);
+
+  return (
     <TooltipProvider>
-      <div className="space-y-6 max-w-6xl mx-auto p-6">
-        {/* Header */}
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Schedule Management</h1>
-            <p className="text-muted-foreground">Generate and manage tournament schedules</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {alliances.length === 0 && <Badge className="bg-secondary text-secondary-foreground">No alliances loaded</Badge>}
-            {alliances.length > 0 && <Badge className="bg-green-600 text-white">{alliances.length} alliances</Badge>}
-          </div>
+          <h1 className="text-2xl font-semibold">Schedule</h1>
         </div>
 
-        <Separator />
-
-        {/* Stats Overview */}
-        {stats && (
-          <Collapsible open={isStatsExpanded} onOpenChange={setIsStatsExpanded}>
+        {/* Stats Summary */}
+        {user && stats && (
+          <Collapsible>
             <CollapsibleTrigger asChild>
-              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Info className="h-5 w-5" />
-                        <CardTitle>Schedule Statistics</CardTitle>
-                      </div>
-                      {!isStatsExpanded && (
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span>{stats.totalMatches} matches</span>
-                          <span>•</span>
-                          <span>{stats.totalRounds} rounds</span>
-                          <span>•</span>
-                          <span>{stats.avgMatchesPerAlliance.toFixed(1)} avg/alliance</span>
-                        </div>
-                      )}
-                    </div>
-                    {isStatsExpanded ? (
-                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </CardHeader>
-              </Card>
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Schedule Statistics
+                </span>
+                                 <ChevronRight className="h-4 w-4" />
+              </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <Card className="mt-2">
@@ -447,13 +429,13 @@ export default function ScheduleRoute() {
         )}
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="config" className="space-y-4">
+        <Tabs defaultValue={user ? "config" : "existing"} className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="config" className="flex items-center gap-2">
+            <TabsTrigger value="config" className="flex items-center gap-2" disabled={!user}>
               <Settings className="h-4 w-4" />
               Configuration
             </TabsTrigger>
-            <TabsTrigger value="generated" className="flex items-center gap-2">
+            <TabsTrigger value="generated" className="flex items-center gap-2" disabled={!user}>
               <Play className="h-4 w-4" />
               Generated Schedule
             </TabsTrigger>
@@ -463,212 +445,246 @@ export default function ScheduleRoute() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Configuration Tab */}
-          <TabsContent value="config" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Schedule Configuration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Event Details */}
-                <div className="space-y-4">
-                  <h4 className="text-lg font-semibold flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    Event Details
-                  </h4>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="event-day">Event Day</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start font-normal">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {day ? day.toDateString() : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="p-0">
-                          <Calendar 
-                            mode="single" 
-                            selected={day} 
-                            onSelect={setDay} 
-                            initialFocus 
-                            required
+          {/* Configuration Tab - Only show if user is logged in */}
+          {user && (
+            <TabsContent value="config" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Schedule Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Event Details */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      Event Details
+                    </h4>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="event-day">Event Day</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start font-normal">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {day ? day.toDateString() : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="p-0">
+                            <Calendar 
+                              mode="single" 
+                              selected={day} 
+                              onSelect={setDay} 
+                              initialFocus 
+                              required
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="start-time">Start Time</Label>
+                        <div className="relative">
+                          <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            id="start-time"
+                            type="time" 
+                            value={startTime} 
+                            onChange={(e) => setStartTime(e.target.value)} 
+                            className="pl-10"
                           />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="start-time">Start Time</Label>
-                      <div className="relative">
-                        <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="rr-rounds">Round-Robin Rounds</Label>
                         <Input 
-                          id="start-time"
-                          type="time" 
-                          value={startTime} 
-                          onChange={(e) => setStartTime(e.target.value)} 
-                          className="pl-10"
+                          id="rr-rounds"
+                          type="number" 
+                          min={1} 
+                          value={rrRounds} 
+                          onChange={(e) => setRrRounds(Number(e.target.value))} 
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="rr-rounds">Round-Robin Rounds</Label>
-                      <Input 
-                        id="rr-rounds"
-                        type="number" 
-                        min={1} 
-                        value={rrRounds} 
-                        onChange={(e) => setRrRounds(Number(e.target.value))} 
-                      />
+                  </div>
+
+                  <Separator />
+
+                  {/* Match Settings */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Match Settings
+                    </h4>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="interval">Minutes Between Matches</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input 
+                              id="interval"
+                              type="number" 
+                              min={1} 
+                              value={intervalMin} 
+                              onChange={(e) => setIntervalMin(e.target.value)} 
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Time gap between consecutive matches</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lunch-duration">Lunch Duration (minutes)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input 
+                              id="lunch-duration"
+                              type="number" 
+                              min={15} 
+                              value={lunchDurationMin} 
+                              onChange={(e) => setLunchDurationMin(Number(e.target.value))} 
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Duration of lunch break</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <Separator />
+                  <Separator />
 
-                {/* Match Settings */}
+                  {/* Actions */}
+                  <div className="flex gap-4">
+                    <Button onClick={generate} size="lg" className="px-6">
+                      <Play className="mr-2 h-4 w-4" />
+                      Generate Schedule
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={() => {
+                        if (confirm("⚠️ DANGER: This will permanently delete ALL schedule data and matches from the database. This action cannot be undone.\n\nAre you absolutely sure you want to continue?")) {
+                          clearAllScheduleData.mutate();
+                        }
+                      }}
+                      className="px-6"
+                      size="lg"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Clear All Data
+                    </Button>
+                  </div>
+
+                  {/* Status Display */}
+                  {status && (
+                    <div className="mt-4 p-3 bg-muted rounded-lg">
+                      <div className="text-sm text-muted-foreground">{status}</div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Generated Schedule Tab - Only show if user is logged in */}
+          {user && (
+            <TabsContent value="generated" className="space-y-4">
+              {generatedBlocks.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-muted-foreground">
+                      <Play className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                      <p>No generated schedule yet.</p>
+                      <p className="text-sm">Go to the Configuration tab to generate a schedule.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
                 <div className="space-y-4">
-                  <h4 className="text-lg font-semibold flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Match Settings
-                  </h4>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="interval">Minutes Between Matches</Label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Input 
-                            id="interval"
-                            type="number" 
-                            min={1} 
-                            value={intervalMin} 
-                            onChange={(e) => setIntervalMin(e.target.value)} 
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Time gap between consecutive matches</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lunch-duration">Lunch Duration (minutes)</Label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Input 
-                            id="lunch-duration"
-                            type="number" 
-                            min={1} 
-                            value={lunchDurationMin} 
-                            onChange={(e) => setLunchDurationMin(Number(e.target.value))} 
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Duration of the lunch break</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Generated Schedule</h3>
+                    <Button 
+                      onClick={save} 
+                      size="lg" 
+                      className="px-6"
+                      disabled={saveMatches.isPending}
+                    >
+                      {saveMatches.isPending ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save to Database
+                        </>
+                      )}
+                    </Button>
                   </div>
+                  <ScrollArea className="h-[calc(100vh-400px)]">
+                    <div className="space-y-4 pr-4">
+                      {generatedBlocks.map((block, blockIndex) => (
+                        <div key={blockIndex}>
+                          {block.activity.type === "matches" ? (
+                            <MatchesBlock
+                              block={block}
+                              blockIndex={blockIndex}
+                              isExpanded={expandedRounds.has(blockIndex)}
+                              onToggle={toggleRound}
+                              allianceName={allianceName}
+                            />
+                          ) : (
+                            <Card>
+                              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleRound(blockIndex)}>
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-lg font-semibold text-yellow-700">
+                                    🍽️ Lunch Break
+                                  </CardTitle>
+                                  {expandedRounds.has(blockIndex) ? (
+                                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                  )}
+                                </div>
+                              </CardHeader>
+                              {expandedRounds.has(blockIndex) && (
+                                <CardContent>
+                                  <div className="text-muted-foreground">
+                                    Starting at {formatTime(new Date(block.startTime))} - {block.activity.duration} minutes
+                                  </div>
+                                </CardContent>
+                              )}
+                            </Card>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
+              )}
+            </TabsContent>
+          )}
 
-                {/* Action Buttons */}
-                <Separator />
-                <div className="flex items-center gap-3 pt-2">
-                  <Button onClick={generate} className="px-6" size="lg">
-                    <Play className="mr-2 h-4 w-4" />
-                    Generate Schedule
-                  </Button>
-                  <Button variant="secondary" onClick={() => setGeneratedBlocks([])} size="lg">
-                    Clear Generated
-                  </Button>
-                  <Button variant="default" onClick={save} disabled={generatedMatchesData.length === 0} size="lg">
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Schedule
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => {
-                      if (confirm("⚠️ DANGER: This will permanently delete ALL schedule data and matches from the database. This action cannot be undone.\n\nAre you absolutely sure you want to continue?")) {
-                        clearAllScheduleData();
-                      }
-                    }}
-                    className="px-6"
-                    size="lg"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear All Data
-                  </Button>
-                </div>
-
-                {/* Status Display */}
-                {status && (
-                  <div className="mt-4 p-3 bg-muted rounded-lg">
-                    <div className="text-sm text-muted-foreground">{status}</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Generated Schedule Tab */}
-          <TabsContent value="generated" className="space-y-4">
-            {generatedBlocks.length === 0 ? (
+          {/* Existing Schedule Tab - Always show */}
+          <TabsContent value="existing" className="space-y-4">
+            {scheduleError ? (
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-center text-muted-foreground">
-                    <Play className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    <p>No generated schedule yet.</p>
-                    <p className="text-sm">Go to the Configuration tab to generate a schedule.</p>
+                  <div className="text-center text-red-600">
+                    <CalendarIcon className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p>Error loading schedule</p>
+                    <p className="text-sm">{scheduleError.message}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This might be due to database permissions. Check the browser console for details.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
-            ) : (
-              <ScrollArea className="h-[600px]">
-                <div className="space-y-4 pr-4">
-                  {generatedBlocks.map((block, blockIndex) => (
-                    <div key={blockIndex}>
-                      {block.activity.type === "matches" ? (
-                        <MatchesBlock
-                          block={block}
-                          blockIndex={blockIndex}
-                          isExpanded={expandedRounds.has(blockIndex)}
-                          onToggle={toggleRound}
-                          allianceName={allianceName}
-                        />
-                      ) : (
-                        <Card>
-                          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleRound(blockIndex)}>
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-lg font-semibold text-yellow-700">
-                                🍽️ Lunch Break
-                              </CardTitle>
-                              {expandedRounds.has(blockIndex) ? (
-                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                              )}
-                            </div>
-                          </CardHeader>
-                          {expandedRounds.has(blockIndex) && (
-                            <CardContent>
-                              <div className="text-muted-foreground">
-                                Starting at {formatTime(new Date(block.startTime))} - {block.activity.duration} minutes
-                              </div>
-                            </CardContent>
-                          )}
-                        </Card>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          {/* Existing Schedule Tab */}
-          <TabsContent value="existing" className="space-y-4">
-            {!hasExistingData ? (
+            ) : !hasExistingData ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center text-muted-foreground">
@@ -679,7 +695,7 @@ export default function ScheduleRoute() {
                 </CardContent>
               </Card>
             ) : (
-              <ScrollArea className="h-[600px]">
+              <ScrollArea className="h-[calc(100vh-400px)]">
                 <div className="space-y-4 pr-4">
                   {scheduleLoading && (
                     <div className="text-center py-8">
