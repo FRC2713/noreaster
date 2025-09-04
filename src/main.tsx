@@ -22,6 +22,7 @@ import MatchDetails from './routes/match-details'
 import Match from './routes/match'
 import Schedule from './routes/schedule'
 import Rankings from './routes/rankings'
+import Live from './routes/live'
 
 const router = createBrowserRouter([
   {
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
       { path: 'matches/:matchId', Component: withAuth(Match) },
       { path: 'schedule', Component: withAuth(Schedule) },
       { path: 'rankings', Component: Rankings },
+      { path: 'live', Component: Live },
     ],
   },
 ], { basename: import.meta.env.BASE_URL })
