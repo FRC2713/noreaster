@@ -48,11 +48,7 @@ function AppLayout() {
       </header>
       <main className="container mx-auto flex-1 p-6">
         <Outlet />
-      </main>
-      <footer className="border-t text-sm p-4 text-center">
-        <img src={`${import.meta.env.BASE_URL}NoreasterBanner.png`} alt="Noreaster Banner" className="mx-auto mb-2 h-10 w-auto" />
-        <span className="opacity-70">© {new Date().getFullYear()} Noreaster</span>
-      </footer>
+      </main>      
     </div>
   );
 }
