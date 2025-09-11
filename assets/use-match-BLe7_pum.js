@@ -1,0 +1,21 @@
+import{c as _}from"./query-vendor-DjGQMdFW.js";import{s as l}from"./index-Ecy2JF11.js";async function u(e){const{data:a,error:r}=await l.from("matches").select(`
+      id, 
+      name, 
+      red_alliance_id, 
+      blue_alliance_id, 
+      scheduled_at, 
+      red_score, 
+      blue_score, 
+      red_auto_score, 
+      blue_auto_score, 
+      red_coral_rp, 
+      red_auto_rp, 
+      red_barge_rp, 
+      blue_coral_rp, 
+      blue_auto_rp, 
+      blue_barge_rp,
+      round,
+      match_number,
+      red:alliances!matches_red_alliance_id_fkey(name), 
+      blue:alliances!matches_blue_alliance_id_fkey(name)
+    `).eq("id",e).single();if(r)throw r;return a}function n(e){return _({queryKey:["match",e],queryFn:()=>u(e),enabled:!!e})}export{n as u};

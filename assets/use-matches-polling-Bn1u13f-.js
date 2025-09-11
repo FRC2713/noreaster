@@ -1,0 +1,21 @@
+import{c}from"./query-vendor-DjGQMdFW.js";import{s as l}from"./index-Ecy2JF11.js";async function n(){const{data:a,error:e}=await l.from("matches").select(`
+      id, 
+      name, 
+      red_alliance_id, 
+      blue_alliance_id, 
+      scheduled_at, 
+      red_score, 
+      blue_score, 
+      red_auto_score, 
+      blue_auto_score, 
+      red_coral_rp, 
+      red_auto_rp, 
+      red_barge_rp, 
+      blue_coral_rp, 
+      blue_auto_rp, 
+      blue_barge_rp,
+      round,
+      match_number,
+      red:alliances!matches_red_alliance_id_fkey(name), 
+      blue:alliances!matches_blue_alliance_id_fkey(name)
+    `).order("scheduled_at",{ascending:!0});if(e)throw e;return a||[]}function _(){const{data:a=[],isLoading:e,error:r,dataUpdatedAt:t}=c({queryKey:["matches","polling"],queryFn:n,refetchInterval:1e4,refetchIntervalInBackground:!0,staleTime:0,gcTime:3e5});return{matches:a,isLoading:e,error:r?r instanceof Error?r.message:"Failed to fetch matches":null,lastUpdated:t?new Date(t):null}}export{_ as u};
