@@ -43,7 +43,6 @@ export function RankingsTable({
       {rows.map((r, idx) => {
         const rank = r.rank ?? idx + 1;
         const isTop3 = rank <= 3;
-        const isTop8 = rank <= 8;
 
         return (
           <Card
