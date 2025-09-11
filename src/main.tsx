@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import AppLayout from './App.tsx';
@@ -6,22 +6,31 @@ import './index.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './lib/auth-context';
 import { withAuth } from './components/with-auth';
+import { SuspenseWrapper } from './components/route-loader';
 
-// Import route components directly
-import Auth from './routes/auth';
-import TeamsNew from './routes/teams.new';
-import Teams from './routes/teams';
-import Team from './routes/team';
-import Alliances from './routes/alliances';
-import AlliancesEdit from './routes/alliances.edit';
-import Alliance from './routes/alliance';
-import Matches from './routes/matches';
-import MatchesPreview from './routes/matches.preview';
-import MatchDetails from './routes/match-details';
-import Match from './routes/match';
-import Schedule from './routes/schedule';
-import Rankings from './routes/rankings';
-import Live from './routes/live';
+// Lazy load route components for code splitting
+const Auth = lazy(() => import('./routes/auth'));
+const TeamsNew = lazy(() => import('./routes/teams.new'));
+const Teams = lazy(() => import('./routes/teams'));
+const Team = lazy(() => import('./routes/team'));
+const Alliances = lazy(() => import('./routes/alliances'));
+const AlliancesEdit = lazy(() => import('./routes/alliances.edit'));
+const Alliance = lazy(() => import('./routes/alliance'));
+const Matches = lazy(() => import('./routes/matches'));
+const MatchesPreview = lazy(() => import('./routes/matches.preview'));
+const MatchDetails = lazy(() => import('./routes/match-details'));
+const Match = lazy(() => import('./routes/match'));
+const Schedule = lazy(() => import('./routes/schedule'));
+const Rankings = lazy(() => import('./routes/rankings'));
+const Live = lazy(() => import('./routes/live'));
+
+// Create wrapped components for protected routes
+const ProtectedTeamsNew = withAuth(TeamsNew);
+const ProtectedTeam = withAuth(Team);
+const ProtectedAlliancesEdit = withAuth(AlliancesEdit);
+const ProtectedAlliance = withAuth(Alliance);
+const ProtectedMatch = withAuth(Match);
+const ProtectedSchedule = withAuth(Schedule);
 
 const router = createBrowserRouter(
   [
@@ -29,21 +38,126 @@ const router = createBrowserRouter(
       path: '/',
       element: <AppLayout />,
       children: [
-        { index: true, Component: Live },
-        { path: 'auth', Component: Auth },
-        { path: 'update-password', Component: Auth },
-        { path: 'teams/new', Component: withAuth(TeamsNew) },
-        { path: 'teams', Component: Teams },
-        { path: 'teams/:teamId', Component: withAuth(Team) },
-        { path: 'alliances', Component: Alliances },
-        { path: 'alliances/edit', Component: withAuth(AlliancesEdit) },
-        { path: 'alliances/:allianceId', Component: withAuth(Alliance) },
-        { path: 'matches', Component: Matches },
-        { path: 'matches/preview', Component: MatchesPreview },
-        { path: 'matches/details/:matchId', Component: MatchDetails },
-        { path: 'matches/:matchId', Component: withAuth(Match) },
-        { path: 'schedule', Component: withAuth(Schedule) },
-        { path: 'rankings', Component: Rankings },
+        {
+          index: true,
+          element: (
+            <SuspenseWrapper>
+              <Live />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'auth',
+          element: (
+            <SuspenseWrapper>
+              <Auth />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'update-password',
+          element: (
+            <SuspenseWrapper>
+              <Auth />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'teams/new',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedTeamsNew />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'teams',
+          element: (
+            <SuspenseWrapper>
+              <Teams />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'teams/:teamId',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedTeam />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'alliances',
+          element: (
+            <SuspenseWrapper>
+              <Alliances />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'alliances/edit',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedAlliancesEdit />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'alliances/:allianceId',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedAlliance />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'matches',
+          element: (
+            <SuspenseWrapper>
+              <Matches />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'matches/preview',
+          element: (
+            <SuspenseWrapper>
+              <MatchesPreview />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'matches/details/:matchId',
+          element: (
+            <SuspenseWrapper>
+              <MatchDetails />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'matches/:matchId',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedMatch />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'schedule',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedSchedule />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'rankings',
+          element: (
+            <SuspenseWrapper>
+              <Rankings />
+            </SuspenseWrapper>
+          ),
+        },
       ],
     },
   ],
