@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router";
-import { Button } from "@/components/ui/button";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { supabase } from "../supabase/client";
-import { AllianceRPToggles } from "@/components/alliance-rp-toggles";
-import { useAlliancesPolling } from "@/lib/use-alliances-polling";
-import { useMatch } from "@/lib/use-match";
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router';
+import { Button } from '@/components/ui/button';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { supabase } from '../supabase/client';
+import { AllianceRPToggles } from '@/components/alliance-rp-toggles';
+import { useAlliancesPolling } from '@/lib/use-alliances-polling';
+import { useMatch } from '@/lib/use-match';
 
 type MatchRow = {
   id: string;
@@ -15,6 +15,8 @@ type MatchRow = {
   scheduled_at: string | null;
   red_score: number | null;
   blue_score: number | null;
+  red_auto_score: number | null;
+  blue_auto_score: number | null;
   red_coral_rp: boolean;
   red_auto_rp: boolean;
   red_barge_rp: boolean;
@@ -40,8 +42,10 @@ export default function MatchEditRoute() {
   // Use store match if available, otherwise use API match
   // const currentMatch = match || apiMatch;
 
-  const [redScore, setRedScore] = useState<string>("");
-  const [blueScore, setBlueScore] = useState<string>("");
+  const [redScore, setRedScore] = useState<string>('');
+  const [blueScore, setBlueScore] = useState<string>('');
+  const [redAutoScore, setRedAutoScore] = useState<string>('');
+  const [blueAutoScore, setBlueAutoScore] = useState<string>('');
   const [redCoral, setRedCoral] = useState(false);
   const [redAlgae, setRedAlgae] = useState(false);
   const [redBarge, setRedBarge] = useState(false);
@@ -52,8 +56,22 @@ export default function MatchEditRoute() {
 
   useEffect(() => {
     if (!currentMatch) return;
-    setRedScore(currentMatch.red_score != null ? String(currentMatch.red_score) : "");
-    setBlueScore(currentMatch.blue_score != null ? String(currentMatch.blue_score) : "");
+    setRedScore(
+      currentMatch.red_score != null ? String(currentMatch.red_score) : ''
+    );
+    setBlueScore(
+      currentMatch.blue_score != null ? String(currentMatch.blue_score) : ''
+    );
+    setRedAutoScore(
+      currentMatch.red_auto_score != null
+        ? String(currentMatch.red_auto_score)
+        : ''
+    );
+    setBlueAutoScore(
+      currentMatch.blue_auto_score != null
+        ? String(currentMatch.blue_auto_score)
+        : ''
+    );
     setRedCoral(!!currentMatch.red_coral_rp);
     setRedAlgae(!!currentMatch.red_auto_rp);
     setRedBarge(!!currentMatch.red_barge_rp);
@@ -68,26 +86,34 @@ export default function MatchEditRoute() {
       const payload: Partial<MatchRow> = {
         red_score: redScore ? Number(redScore) : null,
         blue_score: blueScore ? Number(blueScore) : null,
+        red_auto_score: redAutoScore ? Number(redAutoScore) : null,
+        blue_auto_score: blueAutoScore ? Number(blueAutoScore) : null,
         red_coral_rp: redCoral,
         red_auto_rp: redAlgae,
         red_barge_rp: redBarge,
         blue_coral_rp: blueCoral,
         blue_auto_rp: blueAlgae,
         blue_barge_rp: blueBarge,
-      } as any;
-      const { error } = await supabase.from("matches").update(payload).eq("id", matchId);
+      };
+      const { error } = await supabase
+        .from('matches')
+        .update(payload)
+        .eq('id', matchId);
       if (error) throw error;
     },
     onSuccess: () => {
-      setStatus("Saved.");
-      void queryClient.invalidateQueries({ queryKey: ["matches", "polling"] });
-      void queryClient.invalidateQueries({ queryKey: ["matches", "byId", matchId] });
+      setStatus('Saved.');
+      void queryClient.invalidateQueries({ queryKey: ['matches', 'polling'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['matches', 'byId', matchId],
+      });
     },
-    onError: (e: any) => setStatus(`Save failed: ${e?.message ?? "Unknown error"}`),
+    onError: (e: Error) =>
+      setStatus(`Save failed: ${e?.message ?? 'Unknown error'}`),
   });
 
   function allianceName(id: string) {
-    return alliances.find((a) => a.id === id)?.name ?? id;
+    return alliances.find(a => a.id === id)?.name ?? id;
   }
 
   if (!matchId) return <p>Missing match id</p>;
@@ -98,20 +124,57 @@ export default function MatchEditRoute() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Link to="/matches"><Button variant="ghost">← Back</Button></Link>
-        <h1 className="text-2xl font-semibold">{currentMatch.name ?? "Edit Match"}</h1>
+        <Link to="/matches">
+          <Button variant="ghost">← Back</Button>
+        </Link>
+        <h1 className="text-2xl font-semibold">
+          {currentMatch.name ?? 'Edit Match'}
+        </h1>
       </div>
 
       <div className="rounded-md border p-4">
-        <div className="mb-4 font-semibold text-xl">{allianceName(currentMatch.red_alliance_id)} vs {allianceName(currentMatch.blue_alliance_id)}</div>
+        <div className="mb-4 font-semibold text-xl">
+          {allianceName(currentMatch.red_alliance_id)} vs{' '}
+          {allianceName(currentMatch.blue_alliance_id)}
+        </div>
         <div className="grid sm:grid-cols-2 gap-4 text-lg">
           <div>
             <label className="block mb-1 font-medium">Red Score</label>
-            <input type="number" value={redScore} onChange={(e) => setRedScore(e.target.value)} className="w-full rounded-md border px-3 py-3 text-lg" />
+            <input
+              type="number"
+              value={redScore}
+              onChange={e => setRedScore(e.target.value)}
+              className="w-full rounded-md border px-3 py-3 text-lg"
+            />
           </div>
           <div>
             <label className="block mb-1 font-medium">Blue Score</label>
-            <input type="number" value={blueScore} onChange={(e) => setBlueScore(e.target.value)} className="w-full rounded-md border px-3 py-3 text-lg" />
+            <input
+              type="number"
+              value={blueScore}
+              onChange={e => setBlueScore(e.target.value)}
+              className="w-full rounded-md border px-3 py-3 text-lg"
+            />
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4 text-lg mt-4">
+          <div>
+            <label className="block mb-1 font-medium">Red Auto Score</label>
+            <input
+              type="number"
+              value={redAutoScore}
+              onChange={e => setRedAutoScore(e.target.value)}
+              className="w-full rounded-md border px-3 py-3 text-lg"
+            />
+          </div>
+          <div>
+            <label className="block mb-1 font-medium">Blue Auto Score</label>
+            <input
+              type="number"
+              value={blueAutoScore}
+              onChange={e => setBlueAutoScore(e.target.value)}
+              className="w-full rounded-md border px-3 py-3 text-lg"
+            />
           </div>
         </div>
       </div>
@@ -138,10 +201,14 @@ export default function MatchEditRoute() {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</Button>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+        >
+          Save
+        </Button>
         {status && <span className="text-sm opacity-80">{status}</span>}
       </div>
     </div>
   );
 }
-

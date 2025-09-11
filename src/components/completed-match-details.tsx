@@ -54,6 +54,21 @@ export function CompletedMatchDetails({
           </div>
         )}
         
+        {/* Auto Scores */}
+        {(match.red_auto_score !== null || match.blue_auto_score !== null) && (
+          <div className="flex items-center justify-center gap-6 mb-6">
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground mb-1">Auto Score</div>
+              <div className="text-2xl font-bold text-red-600">{match.red_auto_score ?? '-'}</div>
+            </div>
+            <div className="text-lg font-medium text-muted-foreground">VS</div>
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground mb-1">Auto Score</div>
+              <div className="text-2xl font-bold text-blue-600">{match.blue_auto_score ?? '-'}</div>
+            </div>
+          </div>
+        )}
+        
         {/* Winner Badge */}
         {hasScores && (
           <div className="flex justify-center mb-6">

@@ -150,7 +150,7 @@ export default function MatchesPreviewRoute() {
     return <p className="text-muted-foreground">No unplayed matches.</p>;
 
   return (
-    <div className="fixed inset-0 bg-green-500 flex flex-col justify-end">
+    <div className="w-full h-full bg-green-500 flex flex-col justify-end">
       {/* Alliances in Lower Third */}
       <div className="border-t-2 border-white/20 w-full">
         <div className="flex w-full">

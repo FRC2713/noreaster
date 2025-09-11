@@ -1,31 +1,18 @@
-import { useMatchesPolling } from "@/lib/use-matches-polling";
-import { useAlliancesPolling } from "@/lib/use-alliances-polling";
-import { RankingsTable } from "@/components/rankings-table";
-import { PlayedMatchCard } from "@/components/played-match-card";
-import { UpcomingMatchCard } from "@/components/upcoming-match-card";
-import { computeRankings } from "@/lib/rankings";
-import { useMemo, useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Maximize, Minimize } from "lucide-react";
+import { useMatchesPolling } from '@/lib/use-matches-polling';
+import { useAlliancesPolling } from '@/lib/use-alliances-polling';
+import { RankingsTable } from '@/components/rankings-table';
+import { PlayedMatchCard } from '@/components/played-match-card';
+import { UpcomingMatchCard } from '@/components/upcoming-match-card';
+import { computeRankings } from '@/lib/rankings';
+import { useMemo } from 'react';
 
 export default function LiveRoute() {
-  const { matches, isLoading: matchesLoading, error: matchesError } = useMatchesPolling();
+  const {
+    matches,
+    isLoading: matchesLoading,
+    error: matchesError,
+  } = useMatchesPolling();
   const { alliances } = useAlliancesPolling();
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(!!document.fullscreenElement);
-
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      void document.documentElement.requestFullscreen();
-    } else {
-      void document.exitFullscreen();
-    }
-  }
 
   // Compute rankings
   const rankings = useMemo(() => {
@@ -35,6 +22,8 @@ export default function LiveRoute() {
       blue_alliance_id: m.blue_alliance_id,
       red_score: m.red_score,
       blue_score: m.blue_score,
+      red_auto_score: m.red_auto_score,
+      blue_auto_score: m.blue_auto_score,
       red_coral_rp: !!m.red_coral_rp,
       red_auto_rp: !!m.red_auto_rp,
       red_barge_rp: !!m.red_barge_rp,
@@ -42,30 +31,46 @@ export default function LiveRoute() {
       blue_auto_rp: !!m.blue_auto_rp,
       blue_barge_rp: !!m.blue_barge_rp,
     }));
-    
+
     return computeRankings(alliances, matchRows);
   }, [alliances, matches]);
 
   // Separate matches into played and upcoming
   const now = new Date();
   const playedMatches = matches
-    .filter(match => match.red_score !== null && match.red_score !== undefined && 
-                     match.blue_score !== null && match.blue_score !== undefined)
-    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
+    .filter(
+      match =>
+        match.red_score !== null &&
+        match.red_score !== undefined &&
+        match.blue_score !== null &&
+        match.blue_score !== undefined
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
+    )
     .slice(0, 5);
 
   const upcomingMatches = matches
-    .filter(match => (match.red_score === null || match.red_score === undefined || 
-                      match.blue_score === null || match.blue_score === undefined) &&
-                     new Date(match.scheduled_at) > now)
-    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    .filter(
+      match =>
+        (match.red_score === null ||
+          match.red_score === undefined ||
+          match.blue_score === null ||
+          match.blue_score === undefined) &&
+        new Date(match.scheduled_at) > now
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+    );
 
   // Determine which matches to show on the right
   const matchesToShow = [];
-  
+
   // Add up to 5 recent matches
   matchesToShow.push(...playedMatches);
-  
+
   // If we have less than 5 recent matches, add upcoming matches to fill up to 6 total
   const remainingSlots = 6 - matchesToShow.length;
   if (remainingSlots > 0) {
@@ -73,26 +78,8 @@ export default function LiveRoute() {
   }
 
   return (
-    <div className={`fixed inset-0 ${isFullscreen ? 'top-0' : 'top-16'} bg-background`}>
-      {/* Hide the footer by covering it */}
-      <style>{`
-        footer { display: none !important; }
-      `}</style>
+    <div className="w-full h-full bg-background">
       <div className="w-full h-full p-4">
-        {/* Fullscreen Button */}
-        <div className="absolute top-4 right-4 z-50">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleFullscreen}
-            className="rounded-full size-10 bg-black/50 hover:bg-black/70 text-white"
-            aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
-            title={isFullscreen ? "Exit full screen" : "Enter full screen"}
-          >
-            {isFullscreen ? <Minimize className="size-5" /> : <Maximize className="size-5" />}
-          </Button>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
           {/* Left Column - Twitch Stream and Rankings */}
           <div className="lg:col-span-2 flex flex-col gap-4 h-full">
@@ -100,7 +87,9 @@ export default function LiveRoute() {
             <div className="h-[550px]">
               <div className="h-full bg-black rounded-lg overflow-hidden">
                 <iframe
-                  src="https://player.twitch.tv/?channel=YOUR_CHANNEL&parent=localhost"
+                  src={`https://player.twitch.tv/?channel=robosportsnetwork&parent=${
+                    import.meta.env.DEV ? 'localhost' : 'frc2713.github.io'
+                  }`}
                   height="100%"
                   width="100%"
                   allowFullScreen
@@ -123,11 +112,13 @@ export default function LiveRoute() {
           {/* Right Column - Matches List */}
           <div className="flex flex-col h-full">
             <h2 className="text-lg font-semibold mb-3">Matches</h2>
-            
+
             {matchesLoading && (
-              <p className="text-sm text-muted-foreground">Loading matches...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading matches...
+              </p>
             )}
-            
+
             {matchesError && (
               <p className="text-sm text-red-600">{String(matchesError)}</p>
             )}
@@ -138,14 +129,25 @@ export default function LiveRoute() {
                   <p className="text-muted-foreground">No matches available</p>
                 ) : (
                   matchesToShow.map((match, index) => {
-                    const isUpcoming = (match.red_score === null || match.red_score === undefined || 
-                                       match.blue_score === null || match.blue_score === undefined) &&
-                                      new Date(match.scheduled_at) > now;
+                    const isUpcoming =
+                      (match.red_score === null ||
+                        match.red_score === undefined ||
+                        match.blue_score === null ||
+                        match.blue_score === undefined) &&
+                      new Date(match.scheduled_at) > now;
                     const isRecent = playedMatches.includes(match);
-                    const isNextMatch = isUpcoming && index === playedMatches.length;
-                    
+                    const isNextMatch =
+                      isUpcoming && index === playedMatches.length;
+
                     return (
-                      <div key={match.id} className={`${isNextMatch ? 'ring-2 ring-blue-500 ring-opacity-75 rounded-lg p-1' : ''}`}>
+                      <div
+                        key={match.id}
+                        className={`${
+                          isNextMatch
+                            ? 'ring-2 ring-blue-500 ring-opacity-75 rounded-lg p-1'
+                            : ''
+                        }`}
+                      >
                         {isRecent ? (
                           <PlayedMatchCard match={match} dense />
                         ) : (

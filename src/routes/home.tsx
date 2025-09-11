@@ -1,36 +1,59 @@
-import { useMemo } from "react";
-import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { SectionHeader } from "@/components/section-header";
-import { MatchCard } from "@/components/match-card";
-import { RankingsTable } from "@/components/rankings-table";
-import { useMatchesPolling } from "@/lib/use-matches-polling";
-import { useAlliancesPolling } from "@/lib/use-alliances-polling";
-import { MatchesStatus } from "@/components/matches-status";
-import { computeRankings } from "@/lib/rankings";
-import { Calendar, Trophy, Users, TrendingUp, Clock, History } from "lucide-react";
+import { useMemo } from 'react';
+import { Link } from 'react-router';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { SectionHeader } from '@/components/section-header';
+import { MatchCard } from '@/components/match-card';
+import { RankingsTable } from '@/components/rankings-table';
+import { useMatchesPolling } from '@/lib/use-matches-polling';
+import { useAlliancesPolling } from '@/lib/use-alliances-polling';
+import { MatchesStatus } from '@/components/matches-status';
+import { computeRankings } from '@/lib/rankings';
+import {
+  Calendar,
+  Trophy,
+  Users,
+  TrendingUp,
+  Clock,
+  History,
+} from 'lucide-react';
 
 // Custom description component since CardDescription is not available
-function CardDescription({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={`text-sm text-muted-foreground ${className || ''}`}>{children}</p>;
+function CardDescription({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <p className={`text-sm text-muted-foreground ${className || ''}`}>
+      {children}
+    </p>
+  );
 }
 
 export default function HomeRoute() {
   const { alliances } = useAlliancesPolling();
-  const { matches: allMatches, isLoading: matchesLoading, error: matchesError } = useMatchesPolling();
+  const {
+    matches: allMatches,
+    isLoading: matchesLoading,
+    error: matchesError,
+  } = useMatchesPolling();
 
   const rankings = useMemo(
     () =>
       computeRankings(
         alliances,
-        allMatches.map((m) => ({
+        allMatches.map(m => ({
           red_alliance_id: m.red_alliance_id,
           blue_alliance_id: m.blue_alliance_id,
           red_score: m.red_score,
           blue_score: m.blue_score,
+          red_auto_score: m.red_auto_score,
+          blue_auto_score: m.blue_auto_score,
           red_coral_rp: !!m.red_coral_rp,
           red_auto_rp: !!m.red_auto_rp,
           red_barge_rp: !!m.red_barge_rp,
@@ -43,20 +66,32 @@ export default function HomeRoute() {
   );
 
   const upcoming = useMemo(() => {
-    const unplayed = allMatches.filter((m) => m.red_score == null && m.blue_score == null);
+    const unplayed = allMatches.filter(
+      m => m.red_score == null && m.blue_score == null
+    );
     unplayed.sort((a, b) => {
-      const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Number.NEGATIVE_INFINITY;
-      const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Number.NEGATIVE_INFINITY;
+      const ta = a.scheduled_at
+        ? new Date(a.scheduled_at).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const tb = b.scheduled_at
+        ? new Date(b.scheduled_at).getTime()
+        : Number.NEGATIVE_INFINITY;
       return ta - tb;
     });
     return unplayed.slice(0, 10);
   }, [allMatches]);
 
   const previous = useMemo(() => {
-    const played = allMatches.filter((m) => m.red_score != null && m.blue_score != null);
+    const played = allMatches.filter(
+      m => m.red_score != null && m.blue_score != null
+    );
     played.sort((a, b) => {
-      const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Number.NEGATIVE_INFINITY;
-      const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Number.NEGATIVE_INFINITY;
+      const ta = a.scheduled_at
+        ? new Date(a.scheduled_at).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const tb = b.scheduled_at
+        ? new Date(b.scheduled_at).getTime()
+        : Number.NEGATIVE_INFINITY;
       return tb - ta;
     });
     return played.slice(0, 5);
@@ -66,7 +101,7 @@ export default function HomeRoute() {
     <div className="space-y-8">
       <SectionHeader
         title="Dashboard"
-        actions={(
+        actions={
           <div className="flex items-center gap-3">
             <MatchesStatus />
             <Link to="/matches">
@@ -88,7 +123,7 @@ export default function HomeRoute() {
               </Button>
             </Link>
           </div>
-        )}
+        }
       />
 
       {/* Stats Overview */}
@@ -114,7 +149,11 @@ export default function HomeRoute() {
           <CardContent>
             <div className="text-2xl font-bold">{alliances.length}</div>
             <p className="text-xs text-muted-foreground">
-              {alliances.reduce((acc, a) => acc + a.teams.filter(Boolean).length, 0)} teams assigned
+              {alliances.reduce(
+                (acc, a) => acc + a.teams.filter(Boolean).length,
+                0
+              )}{' '}
+              teams assigned
             </p>
           </CardContent>
         </Card>
@@ -127,7 +166,10 @@ export default function HomeRoute() {
           <CardContent>
             <div className="text-2xl font-bold">{upcoming.length}</div>
             <p className="text-xs text-muted-foreground">
-              Next match {upcoming[0]?.scheduled_at ? new Date(upcoming[0].scheduled_at).toLocaleDateString() : 'TBD'}
+              Next match{' '}
+              {upcoming[0]?.scheduled_at
+                ? new Date(upcoming[0].scheduled_at).toLocaleDateString()
+                : 'TBD'}
             </p>
           </CardContent>
         </Card>
@@ -140,7 +182,11 @@ export default function HomeRoute() {
           <CardContent>
             <div className="text-2xl font-bold">{previous.length}</div>
             <p className="text-xs text-muted-foreground">
-              {previous.length > 0 ? `Last: ${new Date(previous[0].scheduled_at!).toLocaleDateString()}` : 'No matches yet'}
+              {previous.length > 0
+                ? `Last: ${new Date(
+                    previous[0].scheduled_at!
+                  ).toLocaleDateString()}`
+                : 'No matches yet'}
             </p>
           </CardContent>
         </Card>
@@ -156,10 +202,10 @@ export default function HomeRoute() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RankingsTable 
-            rows={rankings} 
-            showWLT={false} 
-            showRank={true} 
+          <RankingsTable
+            rows={rankings}
+            showWLT={false}
+            showRank={true}
             size="sm"
           />
           <div className="mt-6 pt-4 border-t">
@@ -182,7 +228,11 @@ export default function HomeRoute() {
                 <CardTitle>Upcoming Matches</CardTitle>
               </div>
               <Link to="/matches/preview">
-                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-blue-600 hover:text-blue-700"
+                >
                   Preview
                 </Button>
               </Link>
@@ -194,16 +244,21 @@ export default function HomeRoute() {
           <CardContent>
             {matchesLoading && (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted-foreground">Loading matches...</div>
+                <div className="text-sm text-muted-foreground">
+                  Loading matches...
+                </div>
               </div>
             )}
             {matchesError && (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-red-600">Error: {String(matchesError)}</div>
+                <div className="text-sm text-red-600">
+                  Error: {String(matchesError)}
+                </div>
               </div>
             )}
-            {!matchesLoading && !matchesError && (
-              upcoming.length === 0 ? (
+            {!matchesLoading &&
+              !matchesError &&
+              (upcoming.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-sm">No upcoming matches</p>
@@ -211,19 +266,20 @@ export default function HomeRoute() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {upcoming.map((m) => (
+                  {upcoming.map(m => (
                     <div key={m.id}>
                       <MatchCard
                         match={m}
                         showRelativeTime={true}
                         dense={true}
                       />
-                      {upcoming.indexOf(m) < upcoming.length - 1 && <Separator className="mt-3" />}
+                      {upcoming.indexOf(m) < upcoming.length - 1 && (
+                        <Separator className="mt-3" />
+                      )}
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              ))}
           </CardContent>
         </Card>
 
@@ -240,41 +296,47 @@ export default function HomeRoute() {
           <CardContent>
             {matchesLoading && (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted-foreground">Loading matches...</div>
+                <div className="text-sm text-muted-foreground">
+                  Loading matches...
+                </div>
               </div>
             )}
             {matchesError && (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-red-600">Error: {String(matchesError)}</div>
+                <div className="text-sm text-red-600">
+                  Error: {String(matchesError)}
+                </div>
               </div>
             )}
-            {!matchesLoading && !matchesError && (
-              previous.length === 0 ? (
+            {!matchesLoading &&
+              !matchesError &&
+              (previous.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-sm">No completed matches</p>
-                  <p className="text-xs">Complete some matches to see results here</p>
+                  <p className="text-xs">
+                    Complete some matches to see results here
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {previous.map((m) => (
+                  {previous.map(m => (
                     <div key={m.id}>
                       <MatchCard
                         match={m}
                         showRelativeTime={true}
                         dense={true}
                       />
-                      {previous.indexOf(m) < previous.length - 1 && <Separator className="mt-3" />}
+                      {previous.indexOf(m) < previous.length - 1 && (
+                        <Separator className="mt-3" />
+                      )}
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              ))}
           </CardContent>
         </Card>
       </div>
-
-      
 
       <Card>
         <CardHeader>
@@ -288,11 +350,17 @@ export default function HomeRoute() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
-            {alliances.slice(0, 8).map((a) => (
-              <div key={a.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+            {alliances.slice(0, 8).map(a => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+              >
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                  <Link to={`/alliances/${a.id}`} className="font-medium hover:underline">
+                  <Link
+                    to={`/alliances/${a.id}`}
+                    className="font-medium hover:underline"
+                  >
                     {a.name}
                   </Link>
                 </div>
@@ -322,4 +390,3 @@ export default function HomeRoute() {
     </div>
   );
 }
-

@@ -3,8 +3,9 @@ import { supabase } from '../supabase/client';
 
 async function fetchMatches() {
   const { data, error } = await supabase
-    .from("matches")
-    .select(`
+    .from('matches')
+    .select(
+      `
       id, 
       name, 
       red_alliance_id, 
@@ -12,6 +13,8 @@ async function fetchMatches() {
       scheduled_at, 
       red_score, 
       blue_score, 
+      red_auto_score, 
+      blue_auto_score, 
       red_coral_rp, 
       red_auto_rp, 
       red_barge_rp, 
@@ -22,15 +25,21 @@ async function fetchMatches() {
       match_number,
       red:alliances!matches_red_alliance_id_fkey(name), 
       blue:alliances!matches_blue_alliance_id_fkey(name)
-    `)
-    .order("scheduled_at", { ascending: true });
+    `
+    )
+    .order('scheduled_at', { ascending: true });
 
   if (error) throw error;
   return data || [];
 }
 
 export function useMatchesPolling() {
-  const { data: matches = [], isLoading, error, dataUpdatedAt } = useQuery({
+  const {
+    data: matches = [],
+    isLoading,
+    error,
+    dataUpdatedAt,
+  } = useQuery({
     queryKey: ['matches', 'polling'],
     queryFn: fetchMatches,
     refetchInterval: 10000, // Poll every 10 seconds
@@ -42,7 +51,11 @@ export function useMatchesPolling() {
   return {
     matches,
     isLoading,
-    error: error ? (error instanceof Error ? error.message : 'Failed to fetch matches') : null,
+    error: error
+      ? error instanceof Error
+        ? error.message
+        : 'Failed to fetch matches'
+      : null,
     lastUpdated: dataUpdatedAt ? new Date(dataUpdatedAt) : null,
   };
 }

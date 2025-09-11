@@ -7,6 +7,8 @@ export interface DatabaseMatch {
   scheduled_at: string | null;
   red_score: number | null;
   blue_score: number | null;
+  red_auto_score: number | null;
+  blue_auto_score: number | null;
   red_coral_rp: boolean;
   red_auto_rp: boolean;
   red_barge_rp: boolean;
@@ -71,6 +73,8 @@ export interface MatchLite {
   blue_alliance_id: string;
   red_score: number | null;
   blue_score: number | null;
+  red_auto_score: number | null;
+  blue_auto_score: number | null;
   red_coral_rp: boolean;
   red_auto_rp: boolean;
   red_barge_rp: boolean;
@@ -89,13 +93,13 @@ export interface GeneratedMatch {
 }
 
 export interface RoundRobinRound {
-  type: "matches";
+  type: 'matches';
   matches: GeneratedMatch[];
   round: number;
 }
 
 export interface LunchBreak {
-  type: "lunch";
+  type: 'lunch';
   duration: number;
 }
 
