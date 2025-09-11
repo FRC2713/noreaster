@@ -50,8 +50,7 @@ export function RankingsTable({
             key={r.id}
             className={`
               transition-all duration-200 hover:shadow-md hover:scale-[1.02] 
-              ${isTop3 ? 'ring-2 ring-primary/20' : ''}
-              ${isTop8 ? 'border-primary/30' : 'border-muted'}
+              ${isTop3 ? 'border-primary/50' : 'border-muted'}
               ${size === 'lg' ? 'p-1' : ''}
               relative
             `}
@@ -70,7 +69,7 @@ export function RankingsTable({
                   {showRank && (
                     <div className="relative">
                       {r.emblem_image_url ? (
-                        <div className="w-16 h-16 rounded-full overflow-hidden bg-muted flex-shrink-0 ring-2 ring-primary/20">
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-muted flex-shrink-0">
                           <img
                             src={r.emblem_image_url}
                             alt={`${r.name} emblem`}

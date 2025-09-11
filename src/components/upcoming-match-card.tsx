@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Clock, Calendar } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/supabase/client';
@@ -135,79 +136,81 @@ export function UpcomingMatchCard({
   if (dense) {
     // Dense layout for home page cards
     const denseCardContent = (
-      <div className="group border rounded-lg p-4 text-sm flex flex-col gap-3 bg-card hover:bg-accent/50 transition-all duration-200 hover:shadow-sm cursor-pointer">
-        {/* Header Section - Match Info */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <Card className="group transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer">
+        <CardContent className="p-4 text-sm flex flex-col gap-3">
+          {/* Header Section - Match Info */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-foreground">
-                {match.name?.replace('Round ', 'R').replace('Match ', 'M')}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-foreground">
+                  {match.name?.replace('Round ', 'R').replace('Match ', 'M')}
+                </h3>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Main Section - Alliances */}
-        <div className="flex items-center justify-between gap-3">
-          {/* Red Alliance */}
-          <div className="flex flex-col items-center gap-2 p-2 rounded-md bg-red-50/50 dark:bg-red-950/10 flex-1">
-            {/* Red Alliance Emblem */}
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
-              {redAlliance?.emblem_image_url ? (
-                <img
-                  src={redAlliance.emblem_image_url}
-                  alt={`${redAlliance.name} emblem`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full grid place-items-center text-sm text-muted-foreground font-bold">
-                  R
-                </div>
-              )}
+          {/* Main Section - Alliances */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Red Alliance */}
+            <div className="flex flex-col items-center gap-2 p-2 rounded-md bg-red-50/50 dark:bg-red-950/10 flex-1">
+              {/* Red Alliance Emblem */}
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
+                {redAlliance?.emblem_image_url ? (
+                  <img
+                    src={redAlliance.emblem_image_url}
+                    alt={`${redAlliance.name} emblem`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full grid place-items-center text-sm text-muted-foreground font-bold">
+                    R
+                  </div>
+                )}
+              </div>
+
+              {/* Red Alliance Name */}
+              <h4 className="font-medium text-sm text-red-900 dark:text-red-100 text-center">
+                {redName}
+              </h4>
             </div>
 
-            {/* Red Alliance Name */}
-            <h4 className="font-medium text-sm text-red-900 dark:text-red-100 text-center">
-              {redName}
-            </h4>
-          </div>
-
-          {/* VS Section */}
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="text-sm font-medium">VS</span>
-          </div>
-
-          {/* Blue Alliance */}
-          <div className="flex flex-col items-center gap-2 p-2 rounded-md bg-blue-50/50 dark:bg-blue-950/10 flex-1">
-            {/* Blue Alliance Emblem */}
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
-              {blueAlliance?.emblem_image_url ? (
-                <img
-                  src={blueAlliance.emblem_image_url}
-                  alt={`${blueAlliance.name} emblem`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full grid place-items-center text-sm text-muted-foreground font-bold">
-                  B
-                </div>
-              )}
+            {/* VS Section */}
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="text-sm font-medium">VS</span>
             </div>
 
-            {/* Blue Alliance Name */}
-            <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100 text-center">
-              {blueName}
-            </h4>
-          </div>
-        </div>
+            {/* Blue Alliance */}
+            <div className="flex flex-col items-center gap-2 p-2 rounded-md bg-blue-50/50 dark:bg-blue-950/10 flex-1">
+              {/* Blue Alliance Emblem */}
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
+                {blueAlliance?.emblem_image_url ? (
+                  <img
+                    src={blueAlliance.emblem_image_url}
+                    alt={`${blueAlliance.name} emblem`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full grid place-items-center text-sm text-muted-foreground font-bold">
+                    B
+                  </div>
+                )}
+              </div>
 
-        {/* Footer Section - Actions */}
-        {right && (
-          <div className="flex items-center justify-end gap-2">
-            <div onClick={e => e.stopPropagation()}>{right}</div>
+              {/* Blue Alliance Name */}
+              <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100 text-center">
+                {blueName}
+              </h4>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Footer Section - Actions */}
+          {right && (
+            <div className="flex items-center justify-end gap-2">
+              <div onClick={e => e.stopPropagation()}>{right}</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
 
     // If we have a matchId, wrap the entire card in a link
@@ -228,94 +231,96 @@ export function UpcomingMatchCard({
 
   // Regular layout (existing code)
   const cardContent = (
-    <div className="group border rounded-xl p-6 text-base flex flex-col gap-6 bg-card hover:bg-accent/50 transition-all duration-200 hover:shadow-md cursor-pointer min-h-[160px]">
-      {/* Header Section - Match Info */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {match.name && (
-            <div className="flex items-center gap-3">
-              <h3 className="text-xl font-bold text-foreground">
-                {match.name}
-              </h3>
-              {match.round && match.match_number && (
-                <Badge className="text-sm px-3 py-1 h-7 font-medium">
-                  R{match.round}M{match.match_number}
-                </Badge>
+    <Card className="group transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer min-h-[160px]">
+      <CardContent className="p-6 text-base flex flex-col gap-6">
+        {/* Header Section - Match Info */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {match.name && (
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-bold text-foreground">
+                  {match.name}
+                </h3>
+                {match.round && match.match_number && (
+                  <Badge className="text-sm px-3 py-1 h-7 font-medium">
+                    R{match.round}M{match.match_number}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+          <div className={`flex items-center gap-2 ${timeColor}`}>
+            {timeIcon}
+            <span className="text-base font-medium">{timeLabel}</span>
+          </div>
+        </div>
+
+        {/* Main Section - Alliances */}
+        <div className="flex items-center justify-center gap-8">
+          {/* Red Alliance */}
+          <div className="flex flex-col items-center gap-4 p-6 rounded-xl bg-red-50/50 dark:bg-red-950/10 min-w-[14rem]">
+            {/* Red Alliance Emblem */}
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
+              {redAlliance?.emblem_image_url ? (
+                <img
+                  src={redAlliance.emblem_image_url}
+                  alt={`${redAlliance.name} emblem`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-2xl text-muted-foreground font-bold">
+                  R
+                </div>
               )}
             </div>
-          )}
-        </div>
-        <div className={`flex items-center gap-2 ${timeColor}`}>
-          {timeIcon}
-          <span className="text-base font-medium">{timeLabel}</span>
-        </div>
-      </div>
 
-      {/* Main Section - Alliances */}
-      <div className="flex items-center justify-center gap-8">
-        {/* Red Alliance */}
-        <div className="flex flex-col items-center gap-4 p-6 rounded-xl bg-red-50/50 dark:bg-red-950/10 min-w-[14rem]">
-          {/* Red Alliance Emblem */}
-          <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
-            {redAlliance?.emblem_image_url ? (
-              <img
-                src={redAlliance.emblem_image_url}
-                alt={`${redAlliance.name} emblem`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-2xl text-muted-foreground font-bold">
-                R
-              </div>
-            )}
+            {/* Red Alliance Name */}
+            <h4 className="font-bold text-xl text-red-900 dark:text-red-100 text-center max-w-[12rem] leading-tight">
+              {redName}
+            </h4>
+
+            {/* Red Indicator */}
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
           </div>
 
-          {/* Red Alliance Name */}
-          <h4 className="font-bold text-xl text-red-900 dark:text-red-100 text-center max-w-[12rem] leading-tight">
-            {redName}
-          </h4>
-
-          {/* Red Indicator */}
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-        </div>
-
-        {/* VS Section */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="text-2xl font-bold text-muted-foreground">VS</div>
-        </div>
-
-        {/* Blue Alliance */}
-        <div className="flex flex-col items-center gap-4 p-6 rounded-xl bg-blue-50/50 dark:bg-blue-950/10 min-w-[14rem]">
-          {/* Blue Alliance Emblem */}
-          <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
-            {blueAlliance?.emblem_image_url ? (
-              <img
-                src={blueAlliance.emblem_image_url}
-                alt={`${blueAlliance.name} emblem`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-2xl text-muted-foreground font-bold">
-                B
-              </div>
-            )}
+          {/* VS Section */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="text-2xl font-bold text-muted-foreground">VS</div>
           </div>
 
-          {/* Blue Alliance Name */}
-          <h4 className="font-bold text-xl text-blue-900 dark:text-blue-100 text-center max-w-[12rem] leading-tight">
-            {blueName}
-          </h4>
+          {/* Blue Alliance */}
+          <div className="flex flex-col items-center gap-4 p-6 rounded-xl bg-blue-50/50 dark:bg-blue-950/10 min-w-[14rem]">
+            {/* Blue Alliance Emblem */}
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex-shrink-0 shadow-sm">
+              {blueAlliance?.emblem_image_url ? (
+                <img
+                  src={blueAlliance.emblem_image_url}
+                  alt={`${blueAlliance.name} emblem`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-2xl text-muted-foreground font-bold">
+                  B
+                </div>
+              )}
+            </div>
 
-          {/* Blue Indicator */}
-          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            {/* Blue Alliance Name */}
+            <h4 className="font-bold text-xl text-blue-900 dark:text-blue-100 text-center max-w-[12rem] leading-tight">
+              {blueName}
+            </h4>
+
+            {/* Blue Indicator */}
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+          </div>
         </div>
-      </div>
 
-      {/* Footer Section - Actions */}
-      <div className="flex items-center justify-end gap-3">
-        {right ? <div onClick={e => e.stopPropagation()}>{right}</div> : null}
-      </div>
-    </div>
+        {/* Footer Section - Actions */}
+        <div className="flex items-center justify-end gap-3">
+          {right ? <div onClick={e => e.stopPropagation()}>{right}</div> : null}
+        </div>
+      </CardContent>
+    </Card>
   );
 
   // If we have a matchId, wrap the entire card in a link

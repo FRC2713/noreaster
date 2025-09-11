@@ -78,13 +78,174 @@ export default function LiveRoute() {
   }
 
   return (
-    <div className="w-full h-full bg-background">
-      <div className="w-full h-full p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+    <div className="w-full min-h-screen bg-background">
+      <div className="w-full p-2 sm:p-4">
+        {/* Mobile Layout - Stacked */}
+        <div className="flex flex-col h-screen lg:hidden">
+          {/* Twitch Stream - Mobile */}
+          <div className="w-full flex-shrink-0">
+            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              <iframe
+                src={`https://player.twitch.tv/?channel=robosportsnetwork&parent=${
+                  import.meta.env.DEV ? 'localhost' : 'frc2713.github.io'
+                }`}
+                height="100%"
+                width="100%"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+          </div>
+
+          {/* Scrollable Content - Mobile */}
+          <div className="flex-1 overflow-y-auto space-y-4 p-1">
+            {/* Matches List - Mobile */}
+            <div className="w-full">
+              <h2 className="text-lg font-semibold mb-3">Matches</h2>
+              {matchesLoading && (
+                <p className="text-sm text-muted-foreground">
+                  Loading matches...
+                </p>
+              )}
+              {matchesError && (
+                <p className="text-sm text-red-600">{String(matchesError)}</p>
+              )}
+              {!matchesLoading && !matchesError && (
+                <div className="space-y-2">
+                  {matchesToShow.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      No matches available
+                    </p>
+                  ) : (
+                    matchesToShow.map((match, index) => {
+                      const isUpcoming =
+                        (match.red_score === null ||
+                          match.red_score === undefined ||
+                          match.blue_score === null ||
+                          match.blue_score === undefined) &&
+                        new Date(match.scheduled_at) > now;
+                      const isRecent = playedMatches.includes(match);
+                      const isNextMatch =
+                        isUpcoming && index === playedMatches.length;
+
+                      return (
+                        <div
+                          key={match.id}
+                          className={`${
+                            isNextMatch
+                              ? 'ring-2 ring-blue-500 ring-opacity-75 rounded-lg p-1'
+                              : ''
+                          }`}
+                        >
+                          {isRecent ? (
+                            <PlayedMatchCard match={match} dense />
+                          ) : (
+                            <UpcomingMatchCard match={match} dense />
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Rankings - Mobile */}
+            <div className="w-full">
+              <h2 className="text-lg font-semibold mb-3">Rankings</h2>
+              <div className="overflow-x-auto">
+                <RankingsTable rows={rankings} showWLT showRank size="sm" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tablet Layout - 2 columns */}
+        <div className="hidden lg:flex xl:hidden flex-col h-screen">
+          {/* Top Row - Stream and Matches */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-shrink-0">
+            {/* Twitch Stream - Tablet */}
+            <div className="w-full">
+              <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                <iframe
+                  src={`https://player.twitch.tv/?channel=robosportsnetwork&parent=${
+                    import.meta.env.DEV ? 'localhost' : 'frc2713.github.io'
+                  }`}
+                  height="100%"
+                  width="100%"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              </div>
+            </div>
+
+            {/* Matches List - Tablet */}
+            <div className="flex flex-col">
+              <h2 className="text-lg font-semibold mb-3">Matches</h2>
+              {matchesLoading && (
+                <p className="text-sm text-muted-foreground">
+                  Loading matches...
+                </p>
+              )}
+              {matchesError && (
+                <p className="text-sm text-red-600">{String(matchesError)}</p>
+              )}
+              {!matchesLoading && !matchesError && (
+                <div className="flex-1 overflow-y-auto space-y-2">
+                  {matchesToShow.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      No matches available
+                    </p>
+                  ) : (
+                    matchesToShow.map((match, index) => {
+                      const isUpcoming =
+                        (match.red_score === null ||
+                          match.red_score === undefined ||
+                          match.blue_score === null ||
+                          match.blue_score === undefined) &&
+                        new Date(match.scheduled_at) > now;
+                      const isRecent = playedMatches.includes(match);
+                      const isNextMatch =
+                        isUpcoming && index === playedMatches.length;
+
+                      return (
+                        <div
+                          key={match.id}
+                          className={`${
+                            isNextMatch
+                              ? 'ring-2 ring-blue-500 ring-opacity-75 rounded-lg p-1'
+                              : ''
+                          }`}
+                        >
+                          {isRecent ? (
+                            <PlayedMatchCard match={match} dense />
+                          ) : (
+                            <UpcomingMatchCard match={match} dense />
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Row - Rankings */}
+          <div className="w-full flex-1 overflow-y-auto mt-4">
+            <h2 className="text-lg font-semibold mb-3">Rankings</h2>
+            <div className="overflow-x-auto">
+              <RankingsTable rows={rankings} showWLT showRank size="sm" />
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout - 3 columns */}
+        <div className="hidden xl:grid xl:grid-cols-3 gap-4 h-full">
           {/* Left Column - Twitch Stream and Rankings */}
-          <div className="lg:col-span-2 flex flex-col gap-4 h-full">
-            {/* Twitch Stream - Fixed height to leave room for rankings */}
-            <div className="h-[550px]">
+          <div className="xl:col-span-2 flex flex-col gap-4 h-full">
+            {/* Twitch Stream - Desktop */}
+            <div className="h-[500px]">
               <div className="h-full bg-black rounded-lg overflow-hidden">
                 <iframe
                   src={`https://player.twitch.tv/?channel=robosportsnetwork&parent=${
@@ -98,13 +259,11 @@ export default function LiveRoute() {
               </div>
             </div>
 
-            {/* Rankings Display - Takes remaining space */}
+            {/* Rankings Display - Desktop */}
             <div className="flex-1 min-h-0">
-              <div className="h-full bg-card rounded-lg border p-3">
-                <h2 className="text-lg font-semibold mb-2">Rankings</h2>
-                <div className="h-full overflow-hidden">
-                  <RankingsTable rows={rankings} showWLT showRank size="sm" />
-                </div>
+              <h2 className="text-lg font-semibold mb-3">Rankings</h2>
+              <div className="h-full overflow-hidden">
+                <RankingsTable rows={rankings} showWLT showRank size="sm" />
               </div>
             </div>
           </div>

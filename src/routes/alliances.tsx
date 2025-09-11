@@ -6,7 +6,7 @@ import { useAlliancesPolling } from '@/lib/use-alliances-polling';
 import { useMatchesPolling } from '@/lib/use-matches-polling';
 import { computeRankings } from '@/lib/rankings';
 import { RobotImage } from '@/components/robot-image';
-import { Trophy, Users, Target, Calendar, Edit3 } from 'lucide-react';
+import { Users, Edit3 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useAuth } from '@/lib/use-auth';
 
@@ -14,7 +14,6 @@ export default function AlliancesRoute() {
   const { user } = useAuth();
   const {
     alliances,
-    teams,
     isLoading: alliancesLoading,
     error: alliancesError,
   } = useAlliancesPolling();
@@ -58,15 +57,6 @@ export default function AlliancesRoute() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Alliances</h1>
-          <p className="text-muted-foreground mt-2">
-            {alliances.length} alliance{alliances.length !== 1 ? 's' : ''} •{' '}
-            {
-              teams.filter(t =>
-                alliances.some(a => a.teams.some(at => at?.id === t.id))
-              ).length
-            }{' '}
-            teams assigned
-          </p>
         </div>
         {user && (
           <div className="flex gap-3">
@@ -79,85 +69,6 @@ export default function AlliancesRoute() {
           </div>
         )}
       </div>
-
-      {/* Statistics Overview */}
-      {rankings.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Trophy className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Top Alliance</p>
-                  <p className="text-2xl font-bold">
-                    {rankings[0]?.name || 'N/A'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Users className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Teams</p>
-                  <p className="text-2xl font-bold">{teams.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Target className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Assigned Teams
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {
-                      teams.filter(t =>
-                        alliances.some(a => a.teams.some(at => at?.id === t.id))
-                      ).length
-                    }
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Calendar className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Matches Played
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {
-                      allMatches.filter(
-                        m => m.red_score !== null && m.blue_score !== null
-                      ).length
-                    }
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Alliances Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -350,95 +261,6 @@ export default function AlliancesRoute() {
           })
         )}
       </div>
-
-      {/* Rankings Table (if there are matches) */}
-      {rankings.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Alliance Rankings</h2>
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-4 font-medium">Rank</th>
-                      <th className="text-left p-4 font-medium">Alliance</th>
-                      <th className="text-center p-4 font-medium">W</th>
-                      <th className="text-center p-4 font-medium">L</th>
-                      <th className="text-center p-4 font-medium">T</th>
-                      <th className="text-center p-4 font-medium">Avg RP</th>
-                      <th className="text-center p-4 font-medium">Avg Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rankings.map((ranking, index) => (
-                      <tr
-                        key={ranking.id}
-                        className="border-b last:border-b-0 hover:bg-muted/50"
-                      >
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center font-bold text-sm">
-                              {ranking.rank}
-                            </div>
-                            {index < 3 && (
-                              <Trophy
-                                className={`w-5 h-5 ${
-                                  index === 0
-                                    ? 'text-yellow-500'
-                                    : index === 1
-                                    ? 'text-gray-400'
-                                    : 'text-amber-600'
-                                }`}
-                              />
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <Link
-                            to={`/alliances/${ranking.id}`}
-                            className="flex items-center gap-3 hover:text-primary transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-full overflow-hidden bg-muted">
-                              {ranking.emblem_image_url ? (
-                                <img
-                                  src={ranking.emblem_image_url}
-                                  alt={`${ranking.name} emblem`}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full grid place-items-center text-xs font-bold text-muted-foreground">
-                                  {ranking.name.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                            </div>
-                            <span className="font-medium">{ranking.name}</span>
-                          </Link>
-                        </td>
-                        <td className="p-4 text-center font-medium text-green-600">
-                          {ranking.wins}
-                        </td>
-                        <td className="p-4 text-center font-medium text-red-600">
-                          {ranking.losses}
-                        </td>
-                        <td className="p-4 text-center font-medium text-blue-600">
-                          {ranking.ties}
-                        </td>
-                        <td className="p-4 text-center font-medium">
-                          {ranking.avgRp.toFixed(1)}
-                        </td>
-                        <td className="p-4 text-center font-medium">
-                          {ranking.avgScore.toFixed(0)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
