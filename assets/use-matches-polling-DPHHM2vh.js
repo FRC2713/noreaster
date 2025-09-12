@@ -1,4 +1,4 @@
-import{c}from"./query-vendor-DjGQMdFW.js";import{s as l}from"./index-Ecy2JF11.js";async function n(){const{data:a,error:e}=await l.from("matches").select(`
+import{c}from"./query-vendor-DjGQMdFW.js";import{s as l}from"./index-OSJmVpKI.js";async function n(){const{data:a,error:e}=await l.from("matches").select(`
       id, 
       name, 
       red_alliance_id, 
