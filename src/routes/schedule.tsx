@@ -156,6 +156,7 @@ const DEFAULT_SETTINGS = {
   rrRounds: 4,
   intervalMin: '10',
   lunchDurationMin: 60,
+  desiredLunchTime: '12:00',
 };
 
 export default function ScheduleRoute() {
@@ -182,6 +183,9 @@ export default function ScheduleRoute() {
   const [intervalMin, setIntervalMin] = useState(DEFAULT_SETTINGS.intervalMin);
   const [lunchDurationMin, setLunchDurationMin] = useState(
     DEFAULT_SETTINGS.lunchDurationMin
+  );
+  const [desiredLunchTime, setDesiredLunchTime] = useState(
+    DEFAULT_SETTINGS.desiredLunchTime
   );
   const [generatedBlocks, setGeneratedBlocks] = useState<
     ScheduleBlock<RoundRobinRound | LunchBreak>[]
@@ -263,6 +267,7 @@ export default function ScheduleRoute() {
         intervalMin,
         rrRounds,
         lunchDurationMin,
+        desiredLunchTime,
       };
 
       const generatedBlocksData = generateSchedule(alliances, config);
@@ -456,7 +461,7 @@ export default function ScheduleRoute() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
+      <div className="h-screen flex flex-col space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Schedule</h1>
         </div>
@@ -556,24 +561,28 @@ export default function ScheduleRoute() {
         )}
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue={user ? 'config' : 'existing'} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger
-              value="config"
-              className="flex items-center gap-2"
-              disabled={!user}
-            >
-              <Settings className="h-4 w-4" />
-              Configuration
-            </TabsTrigger>
-            <TabsTrigger
-              value="generated"
-              className="flex items-center gap-2"
-              disabled={!user}
-            >
-              <Play className="h-4 w-4" />
-              Generated Schedule
-            </TabsTrigger>
+        <Tabs
+          defaultValue={user ? 'config' : 'existing'}
+          className="flex-1 flex flex-col space-y-4"
+        >
+          <TabsList
+            className={`grid w-full ${user ? 'grid-cols-3' : 'grid-cols-1'}`}
+          >
+            {user && (
+              <>
+                <TabsTrigger value="config" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Configuration
+                </TabsTrigger>
+                <TabsTrigger
+                  value="generated"
+                  className="flex items-center gap-2"
+                >
+                  <Play className="h-4 w-4" />
+                  Generated Schedule
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="existing" className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4" />
               Existing Schedule
@@ -582,7 +591,7 @@ export default function ScheduleRoute() {
 
           {/* Configuration Tab - Only show if user is logged in */}
           {user && (
-            <TabsContent value="config" className="space-y-6">
+            <TabsContent value="config" className="flex-1 space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -696,6 +705,26 @@ export default function ScheduleRoute() {
                           </TooltipContent>
                         </Tooltip>
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="desired-lunch-time">
+                          Desired Lunch Time
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input
+                              id="desired-lunch-time"
+                              type="time"
+                              value={desiredLunchTime}
+                              onChange={e =>
+                                setDesiredLunchTime(e.target.value)
+                              }
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Preferred time for lunch break (HH:MM format)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     </div>
                   </div>
 
@@ -741,7 +770,10 @@ export default function ScheduleRoute() {
 
           {/* Generated Schedule Tab - Only show if user is logged in */}
           {user && (
-            <TabsContent value="generated" className="space-y-4">
+            <TabsContent
+              value="generated"
+              className="flex-1 flex flex-col space-y-4"
+            >
               {generatedBlocks.length === 0 ? (
                 <Card>
                   <CardContent className="pt-6">
@@ -755,7 +787,7 @@ export default function ScheduleRoute() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-4">
+                <div className="flex-1 flex flex-col space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">
                       Generated Schedule
@@ -779,7 +811,7 @@ export default function ScheduleRoute() {
                       )}
                     </Button>
                   </div>
-                  <ScrollArea className="h-[calc(100vh-400px)]">
+                  <ScrollArea className="flex-1">
                     <div className="space-y-4 pr-4">
                       {generatedBlocks.map((block, blockIndex) => (
                         <div key={blockIndex}>
@@ -829,7 +861,10 @@ export default function ScheduleRoute() {
           )}
 
           {/* Existing Schedule Tab - Always show */}
-          <TabsContent value="existing" className="space-y-4">
+          <TabsContent
+            value="existing"
+            className="flex-1 flex flex-col space-y-4"
+          >
             {scheduleError ? (
               <Card>
                 <CardContent className="pt-6">
@@ -857,7 +892,7 @@ export default function ScheduleRoute() {
                 </CardContent>
               </Card>
             ) : (
-              <ScrollArea className="h-[calc(100vh-400px)]">
+              <ScrollArea className="flex-1">
                 <div className="space-y-4 pr-4">
                   {scheduleLoading && (
                     <div className="text-center py-8">

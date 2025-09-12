@@ -1,7 +1,12 @@
-import { v4 } from "uuid";
-import type { GeneratedMatch, RoundRobinRound, LunchBreak, ScheduleBlock } from '@/types';
+import type {
+  GeneratedMatch,
+  LunchBreak,
+  RoundRobinRound,
+  ScheduleBlock,
+} from '@/types';
+import { v4 } from 'uuid';
 
-export type { GeneratedMatch, RoundRobinRound, LunchBreak, ScheduleBlock };
+export type { GeneratedMatch, LunchBreak, RoundRobinRound, ScheduleBlock };
 
 export type Alliance = { id: string; name: string };
 
@@ -11,6 +16,7 @@ export type ScheduleConfig = {
   lunchDurationMin: number;
   intervalMin: string;
   rrRounds: number;
+  desiredLunchTime: string;
 };
 
 export type ScheduleStats = {
@@ -29,12 +35,11 @@ export type ScheduleStats = {
   avgMatchesPerAlliance: number;
 };
 
-
 /**
  * Converts a date and time string to ISO format
  */
 export function toISODateTime(date: Date, timeHHMM: string): string {
-  const [hh, mm] = timeHHMM.split(":").map((n) => Number(n));
+  const [hh, mm] = timeHHMM.split(':').map(n => Number(n));
   const d = new Date(date);
   d.setHours(hh ?? 0, mm ?? 0, 0, 0);
   return d.toISOString();
@@ -52,12 +57,14 @@ export function addMinutes(iso: string, minutes: number): string {
 /**
  * Checks if an ISO time is within a range
  */
-export function inRange(iso: string, startIso: string, endIso: string): boolean {
+export function inRange(
+  iso: string,
+  startIso: string,
+  endIso: string
+): boolean {
   const t = new Date(iso).getTime();
   return t >= new Date(startIso).getTime() && t <= new Date(endIso).getTime();
 }
-
-
 
 /**
  * Generates a multi-round tournament schedule that fills all available time slots
@@ -70,32 +77,32 @@ export function generateSchedule(
   config: ScheduleConfig
 ): ScheduleBlock<RoundRobinRound | LunchBreak>[] {
   if (alliances.length < 2) {
-    throw new Error("Need at least 2 alliances.");
+    throw new Error('Need at least 2 alliances.');
   }
-
-
-const LUNCH_WINDOW_START_TIME = new Date(toISODateTime(config.day, "11:30"));
-const LUNCH_WINDOW_END_TIME = new Date(toISODateTime(config.day, "13:00"));
 
   // Generate all possible round-robin pairings for the maximum number of rounds
   const allPairings = generateRoundRobinPairings(alliances);
 
-  // Assign time slots to matches, ensuring balanced red/blue assignments across rounds
-  const blocks: ScheduleBlock<RoundRobinRound | LunchBreak>[] = []; 
+  // Calculate the desired lunch time
+  const desiredLunchTime = new Date(
+    toISODateTime(config.day, config.desiredLunchTime)
+  );
+
+  // First, generate all rounds without lunch breaks to calculate timing
+  const tempBlocks: ScheduleBlock<RoundRobinRound>[] = [];
   const currentTime = new Date(toISODateTime(config.day, config.startTime));
-  
+
   for (let round = 0; round < config.rrRounds; round++) {
     const thisRound: ScheduleBlock<RoundRobinRound> = {
       startTime: currentTime.toISOString(),
       activity: {
-        type: "matches",
-        matches: [],
+        type: 'matches',
         round: round,
+        matches: [],
       },
     };
-    
-    
-    allPairings.forEach((pairing) => {
+
+    allPairings.forEach(pairing => {
       // Swap colors every round to ensure balanced assignments
       // Round 1: alliance1 = red, alliance2 = blue
       // Round 2: alliance1 = blue, alliance2 = red
@@ -111,27 +118,80 @@ const LUNCH_WINDOW_END_TIME = new Date(toISODateTime(config.day, "13:00"));
         scheduled_at: new Date(currentTime),
         round: round + 1,
       };
-      
+
       thisRound.activity.matches.push(match);
-      currentTime.setMinutes(currentTime.getMinutes() + parseInt(config.intervalMin));
+      currentTime.setMinutes(
+        currentTime.getMinutes() + parseInt(config.intervalMin)
+      );
     });
 
-    blocks.push(thisRound);
-    if (currentTime > LUNCH_WINDOW_START_TIME && currentTime < LUNCH_WINDOW_END_TIME) {
+    tempBlocks.push(thisRound);
+  }
+
+  // Now find the best place to insert lunch break
+  const blocks: ScheduleBlock<RoundRobinRound | LunchBreak>[] = [];
+  let lunchInserted = false;
+
+  for (let i = 0; i < tempBlocks.length; i++) {
+    const round = tempBlocks[i];
+    const roundStartTime = new Date(round.startTime);
+    const roundEndTime = new Date(roundStartTime);
+    roundEndTime.setMinutes(
+      roundEndTime.getMinutes() +
+        allPairings.length * parseInt(config.intervalMin)
+    );
+
+    // Check if we should insert lunch before this round
+    if (!lunchInserted && roundStartTime >= desiredLunchTime) {
+      // Insert lunch break before this round
       blocks.push({
-        startTime: currentTime.toISOString(),
+        startTime: roundStartTime.toISOString(),
         activity: {
-          type: "lunch",
+          type: 'lunch',
           duration: config.lunchDurationMin,
         },
       });
-      currentTime.setMinutes(currentTime.getMinutes() + config.lunchDurationMin);
+      lunchInserted = true;
+
+      // Adjust the round start time to account for lunch
+      roundStartTime.setMinutes(
+        roundStartTime.getMinutes() + config.lunchDurationMin
+      );
+      round.startTime = roundStartTime.toISOString();
+
+      // Update all match times in this round
+      round.activity.matches.forEach((match, matchIndex) => {
+        const matchTime = new Date(roundStartTime);
+        matchTime.setMinutes(
+          matchTime.getMinutes() + matchIndex * parseInt(config.intervalMin)
+        );
+        match.scheduled_at = matchTime;
+      });
     }
+
+    blocks.push(round);
+  }
+
+  // If we haven't inserted lunch yet and there are rounds, insert it at the end
+  if (!lunchInserted && tempBlocks.length > 0) {
+    const lastRound = tempBlocks[tempBlocks.length - 1];
+    const lastRoundEndTime = new Date(lastRound.startTime);
+    lastRoundEndTime.setMinutes(
+      lastRoundEndTime.getMinutes() +
+        allPairings.length * parseInt(config.intervalMin)
+    );
+
+    blocks.push({
+      startTime: lastRoundEndTime.toISOString(),
+      activity: {
+        type: 'lunch',
+        duration: config.lunchDurationMin,
+      },
+    });
   }
 
   return blocks;
 }
-
 
 type RoundRobinPairing = {
   red: Alliance;
@@ -142,7 +202,9 @@ type RoundRobinPairing = {
  * Generates a round of round-robin pairings
  * Each round ensures each alliance plays every other alliance exactly once
  */
-function generateRoundRobinPairings(alliances: Alliance[]): Array<RoundRobinPairing> {
+function generateRoundRobinPairings(
+  alliances: Alliance[]
+): Array<RoundRobinPairing> {
   if (alliances.length < 2) {
     return [];
   }
@@ -153,14 +215,14 @@ function generateRoundRobinPairings(alliances: Alliance[]): Array<RoundRobinPair
 
   while (unprocessedAlliances.length > 1) {
     for (let i = 1; i < unprocessedAlliances.length; i++) {
-      console.log("pairing", unprocessedAlliances[0], unprocessedAlliances[i]);
+      console.log('pairing', unprocessedAlliances[0], unprocessedAlliances[i]);
       const red = unprocessedAlliances[0];
       const blue = unprocessedAlliances[i];
       allMatches.push({ red, blue });
     }
     unprocessedAlliances.shift();
   }
-  
+
   // Re-arrange matches to minimize back-to-back occurrences
   const optimizedMatches = minimizeBackToBackMatches(allMatches);
   return optimizedMatches;
@@ -169,46 +231,49 @@ function generateRoundRobinPairings(alliances: Alliance[]): Array<RoundRobinPair
 /**
  * Rearranges matches to minimize back-to-back matches for all alliances
  */
-function minimizeBackToBackMatches(matches: Array<RoundRobinPairing>): Array<RoundRobinPairing> {
+function minimizeBackToBackMatches(
+  matches: Array<RoundRobinPairing>
+): Array<RoundRobinPairing> {
   if (matches.length <= 1) return matches;
-  
+
   const result: Array<RoundRobinPairing> = [];
   const remaining = [...matches];
-  
+
   // Start with the first match
   result.push(remaining.shift()!);
-  
+
   while (remaining.length > 0) {
     const lastMatch = result[result.length - 1];
     const lastAlliances = new Set([lastMatch.red.id, lastMatch.blue.id]);
-    
+
     // Find the best next match (one that doesn't share alliances with the previous match)
     let bestIndex = -1;
-    
+
     // First try to find a match with no shared alliances
     for (let i = 0; i < remaining.length; i++) {
       const match = remaining[i];
       const currentAlliances = new Set([match.red.id, match.blue.id]);
-      
+
       // Check if no alliances overlap
-      const hasOverlap = [...currentAlliances].some(id => lastAlliances.has(id));
+      const hasOverlap = [...currentAlliances].some(id =>
+        lastAlliances.has(id)
+      );
       if (!hasOverlap) {
         bestIndex = i;
         break;
       }
     }
-    
+
     // If no non-overlapping match found, take the first available
     if (bestIndex === -1) {
       bestIndex = 0;
     }
-    
+
     result.push(remaining.splice(bestIndex, 1)[0]);
   }
-  
+
   return result;
 }
-
 
 /**
  * Calculates statistics for a generated schedule
@@ -218,7 +283,7 @@ export function calculateScheduleStats(
   alliances: Alliance[]
 ): ScheduleStats | null {
   if (generated.length === 0) return null;
-  
+
   const perAllianceCount = new Map<string, number>();
   const redAllianceCount = new Map<string, number>();
   const blueAllianceCount = new Map<string, number>();
@@ -226,15 +291,27 @@ export function calculateScheduleStats(
 
   for (const g of generated) {
     // Count total matches per alliance
-    perAllianceCount.set(g.red_alliance_id, (perAllianceCount.get(g.red_alliance_id) ?? 0) + 1);
-    perAllianceCount.set(g.blue_alliance_id, (perAllianceCount.get(g.blue_alliance_id) ?? 0) + 1);
-    
+    perAllianceCount.set(
+      g.red_alliance_id,
+      (perAllianceCount.get(g.red_alliance_id) ?? 0) + 1
+    );
+    perAllianceCount.set(
+      g.blue_alliance_id,
+      (perAllianceCount.get(g.blue_alliance_id) ?? 0) + 1
+    );
+
     // Count red/blue appearances
-    redAllianceCount.set(g.red_alliance_id, (redAllianceCount.get(g.red_alliance_id) ?? 0) + 1);
-    blueAllianceCount.set(g.blue_alliance_id, (blueAllianceCount.get(g.blue_alliance_id) ?? 0) + 1);
-    
+    redAllianceCount.set(
+      g.red_alliance_id,
+      (redAllianceCount.get(g.red_alliance_id) ?? 0) + 1
+    );
+    blueAllianceCount.set(
+      g.blue_alliance_id,
+      (blueAllianceCount.get(g.blue_alliance_id) ?? 0) + 1
+    );
+
     // Track times for turnaround calculations
-    [g.red_alliance_id, g.blue_alliance_id].forEach((id) => {
+    [g.red_alliance_id, g.blue_alliance_id].forEach(id => {
       const arr = timesByAlliance.get(id) ?? [];
       arr.push(new Date(g.scheduled_at).getTime());
       timesByAlliance.set(id, arr);
@@ -265,7 +342,7 @@ export function calculateScheduleStats(
     maxTurnaroundMin.set(id, Math.max(...gaps));
   }
 
-  const rows = alliances.map((a) => ({
+  const rows = alliances.map(a => ({
     id: a.id,
     name: a.name,
     matches: perAllianceCount.get(a.id) ?? 0,
@@ -278,7 +355,9 @@ export function calculateScheduleStats(
 
   const totalMatches = generated.length;
   const totalRounds = Math.max(...generated.map(m => m.round), 0);
-  const avgMatchesPerAlliance = rows.length ? Number((totalMatches * 2 / rows.length).toFixed(2)) : 0;
+  const avgMatchesPerAlliance = rows.length
+    ? Number(((totalMatches * 2) / rows.length).toFixed(2))
+    : 0;
 
   return { rows, totalMatches, totalRounds, avgMatchesPerAlliance };
 }

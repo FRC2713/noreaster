@@ -30,7 +30,6 @@ const ProtectedTeam = withAuth(Team);
 const ProtectedAlliancesEdit = withAuth(AlliancesEdit);
 const ProtectedAlliance = withAuth(Alliance);
 const ProtectedMatch = withAuth(Match);
-const ProtectedSchedule = withAuth(Schedule);
 
 const router = createBrowserRouter(
   [
@@ -146,7 +145,7 @@ const router = createBrowserRouter(
           path: 'schedule',
           element: (
             <SuspenseWrapper>
-              <ProtectedSchedule />
+              <Schedule />
             </SuspenseWrapper>
           ),
         },
