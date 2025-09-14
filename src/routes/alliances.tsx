@@ -3,11 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAlliancesPolling } from '@/lib/use-alliances-polling';
-import { useMatchesPolling } from '@/lib/use-matches-polling';
-import { computeRankings } from '@/lib/rankings';
+import { useRankingsPolling } from '@/lib/use-rankings-polling';
 import { RobotImage } from '@/components/robot-image';
 import { Users, Edit3 } from 'lucide-react';
-import { useMemo } from 'react';
 import { useAuth } from '@/lib/use-auth';
 
 export default function AlliancesRoute() {
@@ -18,35 +16,13 @@ export default function AlliancesRoute() {
     error: alliancesError,
   } = useAlliancesPolling();
   const {
-    matches: allMatches,
-    isLoading: matchesLoading,
-    error: matchesError,
-  } = useMatchesPolling();
+    rankings,
+    isLoading: rankingsLoading,
+    error: rankingsError,
+  } = useRankingsPolling();
 
-  const rankings = useMemo(() => {
-    if (!alliances.length || !allMatches.length) return [];
-
-    return computeRankings(
-      alliances,
-      allMatches.map(m => ({
-        red_alliance_id: m.red_alliance_id,
-        blue_alliance_id: m.blue_alliance_id,
-        red_score: m.red_score,
-        blue_score: m.blue_score,
-        red_auto_score: m.red_auto_score,
-        blue_auto_score: m.blue_auto_score,
-        red_coral_rp: !!m.red_coral_rp,
-        red_auto_rp: !!m.red_auto_rp,
-        red_barge_rp: !!m.red_barge_rp,
-        blue_coral_rp: !!m.blue_coral_rp,
-        blue_auto_rp: !!m.blue_auto_rp,
-        blue_barge_rp: !!m.blue_barge_rp,
-      }))
-    );
-  }, [alliances, allMatches]);
-
-  const isLoading = alliancesLoading || matchesLoading;
-  const error = alliancesError || matchesError;
+  const isLoading = alliancesLoading || rankingsLoading;
+  const error = alliancesError || rankingsError;
 
   if (isLoading) return <p>Loading alliances...</p>;
   if (error) return <p className="text-red-600">Error: {error}</p>;

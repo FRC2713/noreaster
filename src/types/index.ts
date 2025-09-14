@@ -107,3 +107,42 @@ export type ScheduleBlock<T extends RoundRobinRound | LunchBreak> = {
   startTime: string;
   activity: T;
 };
+
+// Double Elimination Tournament types
+export interface DoubleEliminationMatch {
+  id: string;
+  red_alliance_id: string;
+  blue_alliance_id: string;
+  scheduled_at: Date;
+  round: number;
+  bracket: 'winners' | 'losers';
+  match_number: number;
+  winner_advances_to?: string; // ID of next match
+  loser_advances_to?: string; // ID of next match (for losers bracket)
+}
+
+export interface DoubleEliminationRound {
+  type: 'matches';
+  matches: DoubleEliminationMatch[];
+  round: number;
+  bracket: 'winners' | 'losers';
+  description: string;
+}
+
+export interface AllianceRanking {
+  alliance_id: string;
+  alliance_name: string;
+  wins: number;
+  losses: number;
+  win_percentage: number;
+  total_matches: number;
+  rank: number;
+}
+
+export interface DoubleEliminationBracket {
+  winners_bracket: DoubleEliminationRound[];
+  losers_bracket: DoubleEliminationRound[];
+  finals: DoubleEliminationMatch[];
+  total_rounds: number;
+  total_matches: number;
+}

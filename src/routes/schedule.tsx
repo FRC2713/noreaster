@@ -1,55 +1,41 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  ChevronDown,
   ChevronRight,
   Calendar as CalendarIcon,
-  Clock,
   Settings,
-  Save,
-  Trash2,
   Play,
   Info,
 } from 'lucide-react';
-import { MatchesBlock } from '@/components/matches-block';
 import {
   generateSchedule,
   calculateScheduleStats,
 } from '@/lib/schedule-generator';
+import { generateDoubleEliminationBracket } from '@/lib/double-elimination-generator';
+import { useRankingsPolling } from '@/lib/use-rankings-polling';
 import type {
   RoundRobinRound,
   LunchBreak,
   ScheduleBlock,
 } from '@/lib/schedule-generator';
+import type { DoubleEliminationBracket, AllianceRanking } from '@/types';
 import { supabase } from '@/supabase/client';
-import { formatTime } from '@/lib/utils';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useAlliancesPolling } from '@/lib/use-alliances-polling';
 import { useMatchesPolling } from '@/lib/use-matches-polling';
+import { ScheduleConfiguration } from '@/components/schedule-configuration';
+import { RoundRobinSchedule } from '@/components/round-robin-schedule';
+import { DoubleEliminationTournament } from '@/components/double-elimination-tournament';
+import { ExistingSchedule } from '@/components/existing-schedule';
 
 // Type for database schedule records
 type ScheduleRecord = {
@@ -192,8 +178,20 @@ export default function ScheduleRoute() {
   >([]);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
+  // Double elimination tournament state
+  const [doubleEliminationBracket, setDoubleEliminationBracket] =
+    useState<DoubleEliminationBracket | null>(null);
+  const [allianceRankings, setAllianceRankings] = useState<AllianceRanking[]>(
+    []
+  );
+  const [doubleEliminationStartTime, setDoubleEliminationStartTime] =
+    useState('14:00');
+  const [doubleEliminationInterval, setDoubleEliminationInterval] =
+    useState('15');
+
   const { alliances } = useAlliancesPolling();
   const { matches: existingMatches } = useMatchesPolling();
+  const { rankings: currentRankings } = useRankingsPolling();
 
   // Load existing schedule from database
   const {
@@ -275,6 +273,72 @@ export default function ScheduleRoute() {
     } catch (error) {
       setStatus(
         `Generation failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  function generateDoubleElimination() {
+    setStatus(null);
+    setDoubleEliminationBracket(null);
+
+    if (alliances.length < 2) {
+      setStatus('Need at least 2 alliances for double elimination tournament.');
+      return;
+    }
+
+    try {
+      // Use existing matches from the database
+      if (existingMatches.length === 0) {
+        setStatus(
+          'No match data available. Please generate a round robin schedule first.'
+        );
+        return;
+      }
+
+      // Use current rankings from the hook
+      if (currentRankings.length === 0) {
+        setStatus(
+          'No rankings data available. Please ensure matches have been played.'
+        );
+        return;
+      }
+
+      // Convert to the format expected by double elimination generator
+      const rankings = currentRankings.map(ranking => ({
+        alliance_id: ranking.id,
+        alliance_name: ranking.name,
+        wins: ranking.wins,
+        losses: ranking.losses,
+        win_percentage:
+          ranking.played > 0 ? (ranking.wins / ranking.played) * 100 : 0,
+        total_matches: ranking.played,
+        rank: ranking.rank,
+      }));
+
+      setAllianceRankings(rankings);
+
+      // Generate double elimination bracket
+      const startTime = new Date(day);
+      const [hours, minutes] = doubleEliminationStartTime
+        .split(':')
+        .map(Number);
+      startTime.setHours(hours, minutes, 0, 0);
+
+      const bracket = generateDoubleEliminationBracket(
+        rankings,
+        startTime,
+        parseInt(doubleEliminationInterval)
+      );
+
+      setDoubleEliminationBracket(bracket);
+      setStatus(
+        `Double elimination tournament generated with ${bracket.total_matches} matches across ${bracket.total_rounds} rounds.`
+      );
+    } catch (error) {
+      setStatus(
+        `Double elimination generation failed: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`
       );
@@ -566,7 +630,7 @@ export default function ScheduleRoute() {
           className="flex-1 flex flex-col space-y-4"
         >
           <TabsList
-            className={`grid w-full ${user ? 'grid-cols-3' : 'grid-cols-1'}`}
+            className={`grid w-full ${user ? 'grid-cols-4' : 'grid-cols-1'}`}
           >
             {user && (
               <>
@@ -579,7 +643,14 @@ export default function ScheduleRoute() {
                   className="flex items-center gap-2"
                 >
                   <Play className="h-4 w-4" />
-                  Generated Schedule
+                  Round Robin
+                </TabsTrigger>
+                <TabsTrigger
+                  value="double-elimination"
+                  className="flex items-center gap-2"
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  Double Elimination
                 </TabsTrigger>
               </>
             )}
@@ -592,179 +663,24 @@ export default function ScheduleRoute() {
           {/* Configuration Tab - Only show if user is logged in */}
           {user && (
             <TabsContent value="config" className="flex-1 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Schedule Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Event Details */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4" />
-                      Event Details
-                    </h4>
-                    <div className="grid sm:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="event-day">Event Day</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start font-normal"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {day ? day.toDateString() : 'Pick a date'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent align="start" className="p-0">
-                            <Calendar
-                              mode="single"
-                              selected={day}
-                              onSelect={setDay}
-                              initialFocus
-                              required
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="start-time">Start Time</Label>
-                        <div className="relative">
-                          <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="start-time"
-                            type="time"
-                            value={startTime}
-                            onChange={e => setStartTime(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="rr-rounds">Round-Robin Rounds</Label>
-                        <Input
-                          id="rr-rounds"
-                          type="number"
-                          min={1}
-                          value={rrRounds}
-                          onChange={e => setRrRounds(Number(e.target.value))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Match Settings */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Match Settings
-                    </h4>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="interval">
-                          Minutes Between Matches
-                        </Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Input
-                              id="interval"
-                              type="number"
-                              min={1}
-                              value={intervalMin}
-                              onChange={e => setIntervalMin(e.target.value)}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Time gap between consecutive matches</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lunch-duration">
-                          Lunch Duration (minutes)
-                        </Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Input
-                              id="lunch-duration"
-                              type="number"
-                              min={15}
-                              value={lunchDurationMin}
-                              onChange={e =>
-                                setLunchDurationMin(Number(e.target.value))
-                              }
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Duration of lunch break</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="desired-lunch-time">
-                          Desired Lunch Time
-                        </Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Input
-                              id="desired-lunch-time"
-                              type="time"
-                              value={desiredLunchTime}
-                              onChange={e =>
-                                setDesiredLunchTime(e.target.value)
-                              }
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Preferred time for lunch break (HH:MM format)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Actions */}
-                  <div className="flex gap-4">
-                    <Button onClick={generate} size="lg" className="px-6">
-                      <Play className="mr-2 h-4 w-4" />
-                      Generate Schedule
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            '⚠️ DANGER: This will permanently delete ALL schedule data and matches from the database. This action cannot be undone.\n\nAre you absolutely sure you want to continue?'
-                          )
-                        ) {
-                          clearAllScheduleData.mutate();
-                        }
-                      }}
-                      className="px-6"
-                      size="lg"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Clear All Data
-                    </Button>
-                  </div>
-
-                  {/* Status Display */}
-                  {status && (
-                    <div className="mt-4 p-3 bg-muted rounded-lg">
-                      <div className="text-sm text-muted-foreground">
-                        {status}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <ScheduleConfiguration
+                day={day}
+                setDay={setDay}
+                startTime={startTime}
+                setStartTime={setStartTime}
+                rrRounds={rrRounds}
+                setRrRounds={setRrRounds}
+                intervalMin={intervalMin}
+                setIntervalMin={setIntervalMin}
+                lunchDurationMin={lunchDurationMin}
+                setLunchDurationMin={setLunchDurationMin}
+                desiredLunchTime={desiredLunchTime}
+                setDesiredLunchTime={setDesiredLunchTime}
+                onGenerate={generate}
+                onClearAll={() => clearAllScheduleData.mutate()}
+                status={status}
+                alliances={alliances}
+              />
             </TabsContent>
           )}
 
@@ -774,89 +690,15 @@ export default function ScheduleRoute() {
               value="generated"
               className="flex-1 flex flex-col space-y-4"
             >
-              {generatedBlocks.length === 0 ? (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-center text-muted-foreground">
-                      <Play className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                      <p>No generated schedule yet.</p>
-                      <p className="text-sm">
-                        Go to the Configuration tab to generate a schedule.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="flex-1 flex flex-col space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">
-                      Generated Schedule
-                    </h3>
-                    <Button
-                      onClick={save}
-                      size="lg"
-                      className="px-6"
-                      disabled={saveMatches.isPending}
-                    >
-                      {saveMatches.isPending ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" />
-                          Save to Database
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <ScrollArea className="flex-1">
-                    <div className="space-y-4 pr-4">
-                      {generatedBlocks.map((block, blockIndex) => (
-                        <div key={blockIndex}>
-                          {block.activity.type === 'matches' ? (
-                            <MatchesBlock
-                              block={block}
-                              blockIndex={blockIndex}
-                              isExpanded={expandedRounds.has(blockIndex)}
-                              onToggle={toggleRound}
-                              allianceName={allianceName}
-                            />
-                          ) : (
-                            <Card>
-                              <CardHeader
-                                className="cursor-pointer hover:bg-muted/50 transition-colors"
-                                onClick={() => toggleRound(blockIndex)}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-lg font-semibold text-yellow-700">
-                                    🍽️ Lunch Break
-                                  </CardTitle>
-                                  {expandedRounds.has(blockIndex) ? (
-                                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                                  )}
-                                </div>
-                              </CardHeader>
-                              {expandedRounds.has(blockIndex) && (
-                                <CardContent>
-                                  <div className="text-muted-foreground">
-                                    Starting at{' '}
-                                    {formatTime(new Date(block.startTime))} -{' '}
-                                    {block.activity.duration} minutes
-                                  </div>
-                                </CardContent>
-                              )}
-                            </Card>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-              )}
+              <RoundRobinSchedule
+                generatedBlocks={generatedBlocks}
+                expandedRounds={expandedRounds}
+                setExpandedRounds={setExpandedRounds}
+                onSave={save}
+                onToggleRound={toggleRound}
+                allianceName={allianceName}
+                isSaving={saveMatches.isPending}
+              />
             </TabsContent>
           )}
 
@@ -865,87 +707,36 @@ export default function ScheduleRoute() {
             value="existing"
             className="flex-1 flex flex-col space-y-4"
           >
-            {scheduleError ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center text-red-600">
-                    <CalendarIcon className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    <p>Error loading schedule</p>
-                    <p className="text-sm">{scheduleError.message}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This might be due to database permissions. Check the
-                      browser console for details.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : !hasExistingData ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center text-muted-foreground">
-                    <CalendarIcon className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    <p>No existing schedule found.</p>
-                    <p className="text-sm">
-                      Generate and save a schedule to see it here.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <ScrollArea className="flex-1">
-                <div className="space-y-4 pr-4">
-                  {scheduleLoading && (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                      <p className="text-muted-foreground">
-                        Loading schedule...
-                      </p>
-                    </div>
-                  )}
-                  {transformedExistingSchedule.map((block, blockIndex) => (
-                    <div key={blockIndex}>
-                      {block.activity.type === 'matches' ? (
-                        <MatchesBlock
-                          block={block}
-                          blockIndex={blockIndex}
-                          isExpanded={expandedRounds.has(blockIndex)}
-                          onToggle={toggleRound}
-                          allianceName={allianceName}
-                        />
-                      ) : (
-                        <Card>
-                          <CardHeader
-                            className="cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => toggleRound(blockIndex)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-lg font-semibold text-yellow-700">
-                                🍽️ Lunch Break
-                              </CardTitle>
-                              {expandedRounds.has(blockIndex) ? (
-                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                              )}
-                            </div>
-                          </CardHeader>
-                          {expandedRounds.has(blockIndex) && (
-                            <CardContent>
-                              <div className="text-muted-foreground">
-                                Starting at{' '}
-                                {formatTime(new Date(block.startTime))} -{' '}
-                                {block.activity.duration} minutes
-                              </div>
-                            </CardContent>
-                          )}
-                        </Card>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
+            <ExistingSchedule
+              scheduleError={scheduleError}
+              hasExistingData={hasExistingData}
+              scheduleLoading={scheduleLoading}
+              transformedExistingSchedule={transformedExistingSchedule}
+              expandedRounds={expandedRounds}
+              onToggleRound={toggleRound}
+              allianceName={allianceName}
+            />
           </TabsContent>
+
+          {/* Double Elimination Tab - Only show if user is logged in */}
+          {user && (
+            <TabsContent
+              value="double-elimination"
+              className="flex-1 flex flex-col space-y-4"
+            >
+              <DoubleEliminationTournament
+                doubleEliminationBracket={doubleEliminationBracket}
+                allianceRankings={allianceRankings}
+                doubleEliminationStartTime={doubleEliminationStartTime}
+                setDoubleEliminationStartTime={setDoubleEliminationStartTime}
+                doubleEliminationInterval={doubleEliminationInterval}
+                setDoubleEliminationInterval={setDoubleEliminationInterval}
+                onGenerate={generateDoubleElimination}
+                status={status}
+                allianceName={allianceName}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </TooltipProvider>

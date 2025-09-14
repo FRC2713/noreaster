@@ -1,10 +1,8 @@
 import { useMatchesPolling } from '@/lib/use-matches-polling';
-import { useAlliancesPolling } from '@/lib/use-alliances-polling';
+import { useRankingsPolling } from '@/lib/use-rankings-polling';
 import { RankingsTable } from '@/components/rankings-table';
 import { PlayedMatchCard } from '@/components/played-match-card';
 import { UpcomingMatchCard } from '@/components/upcoming-match-card';
-import { computeRankings } from '@/lib/rankings';
-import { useMemo } from 'react';
 
 export default function LiveRoute() {
   const {
@@ -12,28 +10,7 @@ export default function LiveRoute() {
     isLoading: matchesLoading,
     error: matchesError,
   } = useMatchesPolling();
-  const { alliances } = useAlliancesPolling();
-
-  // Compute rankings
-  const rankings = useMemo(() => {
-    const matchRows = matches.map(m => ({
-      id: m.id,
-      red_alliance_id: m.red_alliance_id,
-      blue_alliance_id: m.blue_alliance_id,
-      red_score: m.red_score,
-      blue_score: m.blue_score,
-      red_auto_score: m.red_auto_score,
-      blue_auto_score: m.blue_auto_score,
-      red_coral_rp: !!m.red_coral_rp,
-      red_auto_rp: !!m.red_auto_rp,
-      red_barge_rp: !!m.red_barge_rp,
-      blue_coral_rp: !!m.blue_coral_rp,
-      blue_auto_rp: !!m.blue_auto_rp,
-      blue_barge_rp: !!m.blue_barge_rp,
-    }));
-
-    return computeRankings(alliances, matchRows);
-  }, [alliances, matches]);
+  const { rankings } = useRankingsPolling();
 
   // Separate matches into played and upcoming
   const now = new Date();
