@@ -1,80 +1,56 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  ChevronRight,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Calendar as CalendarIcon,
   Settings,
   Play,
-  Info,
+  MoreVertical,
+  Download,
+  Upload,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import {
   generateSchedule,
   calculateScheduleStats,
 } from '@/lib/schedule-generator';
 import { generateDoubleEliminationBracket } from '@/lib/double-elimination-generator';
-import { useRankingsPolling } from '@/lib/use-rankings-polling';
 import type {
   RoundRobinRound,
   LunchBreak,
   ScheduleBlock,
 } from '@/lib/schedule-generator';
-import type { DoubleEliminationBracket, AllianceRanking } from '@/types';
+import type {
+  DatabaseMatch,
+  DoubleEliminationMatch,
+  DoubleEliminationRound,
+  DatabaseScheduleBlock,
+} from '@/types';
 import { supabase } from '@/supabase/client';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useAlliancesPolling } from '@/lib/use-alliances-polling';
 import { useMatchesPolling } from '@/lib/use-matches-polling';
-import { ScheduleConfiguration } from '@/components/schedule-configuration';
-import { RoundRobinSchedule } from '@/components/round-robin-schedule';
-import { DoubleEliminationTournament } from '@/components/double-elimination-tournament';
-import { ExistingSchedule } from '@/components/existing-schedule';
-
-// Type for database schedule records
-type ScheduleRecord = {
-  id: string;
-  start_time: string;
-  end_time: string | null;
-  name: string;
-  description: string | null;
-  type: string;
-  created_at: string;
-  updated_at: string;
-  match_ids: string[] | null;
-};
-
-// Type for database match records
-type MatchRecord = {
-  id: string;
-  name: string | null;
-  red_alliance_id: string;
-  blue_alliance_id: string;
-  scheduled_at: string | null;
-  red_score: number | null;
-  blue_score: number | null;
-  red_auto_score: number | null;
-  blue_auto_score: number | null;
-  red_coral_rp: boolean;
-  red_auto_rp: boolean;
-  red_barge_rp: boolean;
-  blue_coral_rp: boolean;
-  blue_auto_rp: boolean;
-  blue_barge_rp: boolean;
-  created_at: string;
-};
+import { showToast } from '@/lib/use-toast';
+import { ScheduleConfiguration } from '@/components/schedule/schedule-configuration';
+import { RoundRobinSchedule } from '@/components/schedule/round-robin-schedule';
+import { ExistingSchedule } from '@/components/schedule/existing-schedule';
+import { ScheduleStatistics } from '@/components/schedule/schedule-statistics';
 
 // Function to transform database records to ScheduleBlock format
 function transformScheduleData(
-  scheduleRecords: ScheduleRecord[],
-  matchRecords: MatchRecord[]
-): ScheduleBlock<RoundRobinRound | LunchBreak>[] {
+  scheduleRecords: DatabaseScheduleBlock[],
+  databaseMatchs: DatabaseMatch[]
+): ScheduleBlock<RoundRobinRound | LunchBreak | DoubleEliminationRound>[] {
   return scheduleRecords.map(record => {
     if (
       record.type === 'match' &&
@@ -83,13 +59,16 @@ function transformScheduleData(
     ) {
       // Find matches for this block
       const matches = record.match_ids
-        .map(matchId => matchRecords.find(m => m.id === matchId))
-        .filter((m): m is MatchRecord => m !== undefined)
+        .map(matchId => databaseMatchs.find(m => m.id === matchId))
+        .filter((m): m is DatabaseMatch => m !== undefined)
         .map((m, index) => ({
           id: m.id,
           red_alliance_id: m.red_alliance_id,
           blue_alliance_id: m.blue_alliance_id,
-          scheduled_at: m.scheduled_at ? new Date(m.scheduled_at) : new Date(),
+          scheduled_at: m.scheduled_at
+            ? new Date(m.scheduled_at).toISOString()
+            : new Date().toISOString(),
+          match_type: m.match_type,
           round: index + 1, // We'll need to determine the actual round from the data
         }));
 
@@ -97,12 +76,69 @@ function transformScheduleData(
       const roundMatch = record.name.match(/Round (\d+)/);
       const round = roundMatch ? parseInt(roundMatch[1]) - 1 : 0;
 
+      // Calculate duration from start and end times
+      const duration = record.end_time
+        ? Math.round(
+            (new Date(record.end_time).getTime() -
+              new Date(record.start_time).getTime()) /
+              60000
+          )
+        : matches.length * 5; // Default to 5 minutes per match if no end time
+
       return {
         startTime: record.start_time,
+        duration,
         activity: {
           type: 'matches' as const,
           matches,
           round,
+        },
+      };
+    } else if (
+      record.type === 'playoff' &&
+      record.match_ids &&
+      record.match_ids.length > 0
+    ) {
+      // Handle playoff matches
+      const matches = record.match_ids
+        .map(matchId => databaseMatchs.find(m => m.id === matchId))
+        .filter((m): m is DatabaseMatch => m !== undefined)
+        .map((m, index) => ({
+          id: m.id,
+          red_alliance_id: m.red_alliance_id,
+          blue_alliance_id: m.blue_alliance_id,
+          scheduled_at: m.scheduled_at
+            ? new Date(m.scheduled_at).toISOString()
+            : new Date().toISOString(),
+          match_type: m.match_type,
+          round: index + 1,
+          bracket: 'upper' as const, // Default to upper bracket
+          match_number: index + 1,
+          winner_advances_to: undefined,
+          loser_advances_to: undefined,
+        }));
+
+      // Try to extract round number from the name or description
+      const roundMatch = record.name.match(/Round (\d+)/);
+      const round = roundMatch ? parseInt(roundMatch[1]) - 1 : 0;
+
+      // Calculate duration from start and end times
+      const duration = record.end_time
+        ? Math.round(
+            (new Date(record.end_time).getTime() -
+              new Date(record.start_time).getTime()) /
+              60000
+          )
+        : matches.length * 5; // Default to 5 minutes per match if no end time
+
+      return {
+        startTime: record.start_time,
+        duration,
+        activity: {
+          type: 'playoffs' as const,
+          matches,
+          round,
+          description: record.name,
         },
       };
     } else if (record.type === 'lunch_break') {
@@ -117,6 +153,7 @@ function transformScheduleData(
 
       return {
         startTime: record.start_time,
+        duration,
         activity: {
           type: 'lunch' as const,
           duration,
@@ -124,8 +161,17 @@ function transformScheduleData(
       };
     } else {
       // Unknown type, return as generic block
+      const duration = record.end_time
+        ? Math.round(
+            (new Date(record.end_time).getTime() -
+              new Date(record.start_time).getTime()) /
+              60000
+          )
+        : 30; // Default to 30 minutes for unknown types
+
       return {
         startTime: record.start_time,
+        duration,
         activity: {
           type: 'matches' as const,
           matches: [],
@@ -141,6 +187,7 @@ const DEFAULT_SETTINGS = {
   startTime: '09:00',
   rrRounds: 4,
   intervalMin: '10',
+  doubleEliminationInterval: '15',
   lunchDurationMin: 60,
   desiredLunchTime: '12:00',
 };
@@ -167,6 +214,9 @@ export default function ScheduleRoute() {
   const [startTime, setStartTime] = useState(DEFAULT_SETTINGS.startTime);
   const [rrRounds, setRrRounds] = useState(DEFAULT_SETTINGS.rrRounds);
   const [intervalMin, setIntervalMin] = useState(DEFAULT_SETTINGS.intervalMin);
+  const [doubleEliminationInterval, setDoubleEliminationInterval] = useState(
+    DEFAULT_SETTINGS.doubleEliminationInterval
+  );
   const [lunchDurationMin, setLunchDurationMin] = useState(
     DEFAULT_SETTINGS.lunchDurationMin
   );
@@ -174,24 +224,12 @@ export default function ScheduleRoute() {
     DEFAULT_SETTINGS.desiredLunchTime
   );
   const [generatedBlocks, setGeneratedBlocks] = useState<
-    ScheduleBlock<RoundRobinRound | LunchBreak>[]
+    ScheduleBlock<RoundRobinRound | LunchBreak | DoubleEliminationRound>[]
   >([]);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
-  // Double elimination tournament state
-  const [doubleEliminationBracket, setDoubleEliminationBracket] =
-    useState<DoubleEliminationBracket | null>(null);
-  const [allianceRankings, setAllianceRankings] = useState<AllianceRanking[]>(
-    []
-  );
-  const [doubleEliminationStartTime, setDoubleEliminationStartTime] =
-    useState('14:00');
-  const [doubleEliminationInterval, setDoubleEliminationInterval] =
-    useState('15');
-
   const { alliances } = useAlliancesPolling();
   const { matches: existingMatches } = useMatchesPolling();
-  const { rankings: currentRankings } = useRankingsPolling();
 
   // Load existing schedule from database
   const {
@@ -210,7 +248,7 @@ export default function ScheduleRoute() {
         throw error;
       }
       console.log('Schedule data loaded:', data?.length || 0, 'records');
-      return (data ?? []) as ScheduleRecord[];
+      return (data ?? []) as DatabaseScheduleBlock[];
     },
   });
 
@@ -218,27 +256,7 @@ export default function ScheduleRoute() {
   const transformedExistingSchedule = useMemo(() => {
     if (existingSchedule.length === 0) return [];
 
-    // Transform store matches to MatchRecord format
-    const transformedMatches: MatchRecord[] = existingMatches.map(match => ({
-      id: match.id,
-      name: match.name,
-      red_alliance_id: match.red_alliance_id,
-      blue_alliance_id: match.blue_alliance_id,
-      scheduled_at: match.scheduled_at,
-      red_score: match.red_score,
-      blue_score: match.blue_score,
-      red_auto_score: match.red_auto_score,
-      blue_auto_score: match.blue_auto_score,
-      red_coral_rp: !!match.red_coral_rp,
-      red_auto_rp: !!match.red_auto_rp,
-      red_barge_rp: !!match.red_barge_rp,
-      blue_coral_rp: !!match.blue_coral_rp,
-      blue_auto_rp: !!match.blue_auto_rp,
-      blue_barge_rp: !!match.blue_barge_rp,
-      created_at: new Date().toISOString(), // Default value since store doesn't have this
-    }));
-
-    return transformScheduleData(existingSchedule, transformedMatches);
+    return transformScheduleData(existingSchedule, existingMatches);
   }, [existingSchedule, existingMatches]);
 
   // Check if there's existing data to display
@@ -247,6 +265,7 @@ export default function ScheduleRoute() {
   function generate() {
     setStatus(null);
     setGeneratedBlocks([]);
+
     if (!day || !startTime || !intervalMin || !rrRounds) {
       setStatus(
         'Please pick the event day, start time, interval, and number of rounds.'
@@ -259,86 +278,119 @@ export default function ScheduleRoute() {
     }
 
     try {
+      // Generate round robin schedule
       const config = {
         day,
         startTime,
         intervalMin,
         rrRounds,
+        doubleEliminationInterval,
         lunchDurationMin,
         desiredLunchTime,
       };
 
       const generatedBlocksData = generateSchedule(alliances, config);
       setGeneratedBlocks(generatedBlocksData);
-    } catch (error) {
-      setStatus(
-        `Generation failed: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
-      );
-    }
-  }
-
-  function generateDoubleElimination() {
-    setStatus(null);
-    setDoubleEliminationBracket(null);
-
-    if (alliances.length < 2) {
-      setStatus('Need at least 2 alliances for double elimination tournament.');
-      return;
-    }
-
-    try {
-      // Use existing matches from the database
-      if (existingMatches.length === 0) {
-        setStatus(
-          'No match data available. Please generate a round robin schedule first.'
-        );
-        return;
-      }
-
-      // Use current rankings from the hook
-      if (currentRankings.length === 0) {
-        setStatus(
-          'No rankings data available. Please ensure matches have been played.'
-        );
-        return;
-      }
-
-      // Convert to the format expected by double elimination generator
-      const rankings = currentRankings.map(ranking => ({
-        alliance_id: ranking.id,
-        alliance_name: ranking.name,
-        wins: ranking.wins,
-        losses: ranking.losses,
-        win_percentage:
-          ranking.played > 0 ? (ranking.wins / ranking.played) * 100 : 0,
-        total_matches: ranking.played,
-        rank: ranking.rank,
-      }));
-
-      setAllianceRankings(rankings);
 
       // Generate double elimination bracket
-      const startTime = new Date(day);
-      const [hours, minutes] = doubleEliminationStartTime
-        .split(':')
-        .map(Number);
-      startTime.setHours(hours, minutes, 0, 0);
+      const lastBlock = generatedBlocksData.at(-1);
+      let doubleElimStartTime: string;
+
+      if (lastBlock) {
+        const startTime = new Date(lastBlock.startTime);
+        startTime.setMinutes(startTime.getMinutes() + lastBlock.duration);
+        doubleElimStartTime = startTime.toISOString();
+      } else {
+        // Fallback to current time if no blocks exist
+        doubleElimStartTime = new Date().toISOString();
+      }
 
       const bracket = generateDoubleEliminationBracket(
-        rankings,
-        startTime,
+        alliances.length,
+        new Date(doubleElimStartTime),
         parseInt(doubleEliminationInterval)
       );
 
-      setDoubleEliminationBracket(bracket);
+      // Convert double elimination bracket rounds to ScheduleBlock<DoubleEliminationRound>
+      const doubleElimBlocks: ScheduleBlock<DoubleEliminationRound>[] = [];
+      const matchesByRound: Record<number, DoubleEliminationMatch[]> = {};
+
+      // Group matches by round
+      bracket.matches.forEach(match => {
+        if (match.round !== undefined) {
+          if (!matchesByRound[match.round]) {
+            matchesByRound[match.round] = [];
+          }
+          matchesByRound[match.round].push(match);
+        }
+      });
+
+      // Create ScheduleBlock for each round
+      const doubleElimStartTimeDate = new Date(doubleElimStartTime);
+      Object.keys(matchesByRound).forEach((r: string) => {
+        const round = parseInt(r);
+        const roundMatches = matchesByRound[round] || [];
+        if (roundMatches.length === 0) return;
+
+        // Calculate current round start time
+        let currentTime = new Date(doubleElimStartTimeDate);
+        for (let prevRound = 1; prevRound < round; prevRound++) {
+          const prevRoundMatches = matchesByRound[prevRound] || [];
+          if (prevRoundMatches.length > 0) {
+            const roundDuration =
+              prevRoundMatches.length * parseInt(doubleEliminationInterval);
+            currentTime = new Date(
+              currentTime.getTime() + roundDuration * 60000
+            );
+          }
+        }
+
+        // Determine round description based on bracket type
+        const upperMatches = roundMatches.filter(m => m.bracket === 'upper');
+        const lowerMatches = roundMatches.filter(m => m.bracket === 'lower');
+
+        let description = '';
+        if (upperMatches.length > 0 && lowerMatches.length > 0) {
+          description = `Round ${round} - Upper & Lower Bracket`;
+        } else if (upperMatches.length > 0) {
+          description = `Round ${round} - Upper Bracket`;
+        } else {
+          description = `Round ${round} - Lower Bracket`;
+        }
+
+        const roundDuration =
+          roundMatches.length * parseInt(doubleEliminationInterval);
+
+        const roundBlock: ScheduleBlock<DoubleEliminationRound> = {
+          startTime: currentTime.toISOString(),
+          duration: roundDuration,
+          activity: {
+            type: 'playoffs',
+            matches: roundMatches,
+            round: round,
+            description: description,
+          },
+        };
+
+        doubleElimBlocks.push(roundBlock);
+      });
+
+      // Add double elimination blocks to the generated blocks
+      const allBlocks = [...generatedBlocksData, ...doubleElimBlocks];
+      setGeneratedBlocks(allBlocks);
+
       setStatus(
-        `Double elimination tournament generated with ${bracket.total_matches} matches across ${bracket.total_rounds} rounds.`
+        `Schedules generated successfully! Round robin with ${
+          generatedBlocksData.length
+        } blocks and double elimination with ${
+          bracket.matches.length
+        } matches across ${Object.keys(matchesByRound).length} rounds. Total: ${
+          allBlocks.length
+        } blocks.`
       );
     } catch (error) {
       setStatus(
-        `Double elimination generation failed: ${
+        `Generation failed: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`
       );
@@ -349,14 +401,17 @@ export default function ScheduleRoute() {
   const generatedMatchesData = useMemo(() => {
     return generatedBlocks
       .filter(
-        (block): block is ScheduleBlock<RoundRobinRound> =>
-          block.activity.type === 'matches'
+        (
+          block
+        ): block is ScheduleBlock<RoundRobinRound | DoubleEliminationRound> =>
+          block.activity.type === 'matches' ||
+          block.activity.type === 'playoffs'
       )
       .flatMap(block => block.activity.matches);
   }, [generatedBlocks]);
 
   const saveMatches = useMutation({
-    mutationFn: async (payload: Array<Omit<MatchRecord, 'created_at'>>) => {
+    mutationFn: async (payload: Array<Omit<DatabaseMatch, 'created_at'>>) => {
       const { error } = await supabase.from('matches').insert(payload);
       if (error) throw error;
       return true;
@@ -376,13 +431,13 @@ export default function ScheduleRoute() {
     setStatus('Saving schedule to database...');
 
     // Save matches first to get their IDs
-    const matchesPayload: Omit<MatchRecord, 'created_at'>[] =
-      generatedMatchesData.map((m, idx) => ({
+    const matchesPayload: DatabaseMatch[] = generatedMatchesData.map(
+      (m, idx) => ({
         id: m.id,
         name: `Round ${m.round} - Match ${idx + 1}`,
         red_alliance_id: m.red_alliance_id,
         blue_alliance_id: m.blue_alliance_id,
-        scheduled_at: m.scheduled_at.toISOString(),
+        scheduled_at: m.scheduled_at,
         red_score: null,
         blue_score: null,
         red_auto_score: null,
@@ -393,14 +448,23 @@ export default function ScheduleRoute() {
         blue_coral_rp: false,
         blue_auto_rp: false,
         blue_barge_rp: false,
-      }));
+        match_type: m.match_type,
+      })
+    );
 
     // Save matches first, then use the returned IDs for schedule blocks
     saveMatches
       .mutateAsync(matchesPayload)
       .then(() => {
         // Save schedule blocks with match IDs
-        const scheduleBlocks = generatedBlocks.map((block, blockIndex) => {
+        const scheduleBlocks: Array<{
+          start_time: string;
+          end_time: string;
+          name: string;
+          description: string;
+          type: 'match' | 'lunch_break' | 'playoff';
+          match_ids: string[] | null;
+        }> = generatedBlocks.map((block, blockIndex) => {
           if (block.activity.type === 'matches') {
             const startMatchIndex =
               blockIndex === 0
@@ -420,25 +484,41 @@ export default function ScheduleRoute() {
               )
               .map(m => m.id);
 
+            const endTime = new Date(block.startTime);
+            endTime.setMinutes(endTime.getMinutes() + block.duration);
+
             return {
               start_time: block.startTime,
-              end_time: null,
+              end_time: endTime.toISOString(),
               name: `Round ${block.activity.round + 1}`,
               description: `${block.activity.matches.length} matches`,
               type: 'match',
               match_ids: matchIds,
             };
-          } else {
+          } else if (block.activity.type === 'lunch') {
             const endTime = new Date(block.startTime);
-            endTime.setMinutes(endTime.getMinutes() + block.activity.duration);
+            endTime.setMinutes(endTime.getMinutes() + block.duration);
 
             return {
               start_time: block.startTime,
               end_time: endTime.toISOString(),
               name: 'Lunch Break',
-              description: `${block.activity.duration} minutes`,
+              description: `${block.duration} minutes`,
               type: 'lunch_break',
               match_ids: null,
+            };
+          } else {
+            // Handle DoubleEliminationRound
+            const endTime = new Date(block.startTime);
+            endTime.setMinutes(endTime.getMinutes() + block.duration);
+
+            return {
+              start_time: block.startTime,
+              end_time: endTime.toISOString(),
+              name: block.activity.description,
+              description: `${block.activity.matches.length} matches`,
+              type: 'playoff',
+              match_ids: block.activity.matches.map(m => m.id),
             };
           }
         });
@@ -449,6 +529,7 @@ export default function ScheduleRoute() {
           .insert(scheduleBlocks)
           .then(({ error }) => {
             if (error) {
+              console.error('Failed to save schedule:', error);
               setStatus(`❌ Failed to save schedule: ${error.message}`);
             } else {
               setStatus(
@@ -461,6 +542,7 @@ export default function ScheduleRoute() {
           });
       })
       .catch(error => {
+        console.error('Failed to save matches:', error);
         setStatus(
           `❌ Failed to save matches: ${error.message || 'Unknown error'}`
         );
@@ -486,13 +568,20 @@ export default function ScheduleRoute() {
       return true;
     },
     onSuccess: () => {
-      setStatus('All schedule data cleared.');
       setGeneratedBlocks([]);
+      setStatus('All schedule data cleared.');
+      showToast.info(
+        'Data Cleared',
+        'All match and schedule data has been successfully cleared.'
+      );
+
       void queryClient.invalidateQueries({ queryKey: ['schedule', 'list'] });
       void queryClient.invalidateQueries({ queryKey: ['matches', 'polling'] });
     },
     onError: (e: Error) => {
-      setStatus(`Clear failed: ${e?.message ?? 'Unknown error'}`);
+      const errorMessage = `Clear failed: ${e?.message ?? 'Unknown error'}`;
+      setStatus(errorMessage);
+      showToast.error('Clear Failed', errorMessage);
     },
   });
 
@@ -504,12 +593,6 @@ export default function ScheduleRoute() {
       newExpanded.add(roundIndex);
     }
     setExpandedRounds(newExpanded);
-  }
-
-  function allianceName(allianceId: string) {
-    return (
-      alliances.find(a => a.id === allianceId)?.name ?? `Alliance ${allianceId}`
-    );
   }
 
   // Calculate stats for generated schedule
@@ -528,101 +611,44 @@ export default function ScheduleRoute() {
       <div className="h-screen flex flex-col space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Schedule</h1>
-        </div>
 
-        {/* Stats Summary */}
-        {user && stats && (
-          <Collapsible>
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" className="w-full justify-between">
-                <span className="flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Schedule Statistics
-                </span>
-                <ChevronRight className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreVertical className="h-4 w-4" />
               </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <Card className="mt-2">
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {stats.totalMatches}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Total Matches
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {stats.totalRounds}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Total Rounds
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {Math.floor(stats.totalMatches / stats.totalRounds)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Matches per Round
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {stats.avgMatchesPerAlliance.toFixed(1)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Avg per Alliance
-                      </div>
-                    </div>
-                  </div>
-
-                  <ScrollArea className="h-64">
-                    <table className="w-full text-sm">
-                      <thead className="text-left">
-                        <tr className="border-b">
-                          <th className="py-2 pr-4 font-medium">Alliance</th>
-                          <th className="py-2 pr-4 font-medium">Matches</th>
-                          <th className="py-2 pr-4 font-medium text-red-600">
-                            Red
-                          </th>
-                          <th className="py-2 pr-4 font-medium text-blue-600">
-                            Blue
-                          </th>
-                          <th className="py-2 pr-4 font-medium">
-                            Avg Turnaround
-                          </th>
-                          <th className="py-2 pr-4 font-medium">Range</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stats.rows.map(r => (
-                          <tr key={r.id} className="border-b hover:bg-muted/50">
-                            <td className="py-2 pr-4 font-medium">{r.name}</td>
-                            <td className="py-2 pr-4">{r.matches}</td>
-                            <td className="py-2 pr-4 text-red-600 font-medium">
-                              {r.redMatches}
-                            </td>
-                            <td className="py-2 pr-4 text-blue-600 font-medium">
-                              {r.blueMatches}
-                            </td>
-                            <td className="py-2 pr-4">{r.avgMinutes} min</td>
-                            <td className="py-2 pr-4 text-muted-foreground">
-                              {r.minMinutes}-{r.maxMinutes} min
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Schedule Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => window.location.reload()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh Data
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Download className="mr-2 h-4 w-4" />
+                Export Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Upload className="mr-2 h-4 w-4" />
+                Import Schedule
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {user && (
+                <DropdownMenuItem
+                  onClick={() => clearAllScheduleData.mutate()}
+                  variant="destructive"
+                  disabled={clearAllScheduleData.isPending}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {clearAllScheduleData.isPending
+                    ? 'Clearing...'
+                    : 'Clear All Data'}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         {/* Main Content Tabs */}
         <Tabs
@@ -630,7 +656,7 @@ export default function ScheduleRoute() {
           className="flex-1 flex flex-col space-y-4"
         >
           <TabsList
-            className={`grid w-full ${user ? 'grid-cols-4' : 'grid-cols-1'}`}
+            className={`grid w-full ${user ? 'grid-cols-3' : 'grid-cols-1'}`}
           >
             {user && (
               <>
@@ -643,14 +669,7 @@ export default function ScheduleRoute() {
                   className="flex items-center gap-2"
                 >
                   <Play className="h-4 w-4" />
-                  Round Robin
-                </TabsTrigger>
-                <TabsTrigger
-                  value="double-elimination"
-                  className="flex items-center gap-2"
-                >
-                  <CalendarIcon className="h-4 w-4" />
-                  Double Elimination
+                  Generated Schedule
                 </TabsTrigger>
               </>
             )}
@@ -672,12 +691,13 @@ export default function ScheduleRoute() {
                 setRrRounds={setRrRounds}
                 intervalMin={intervalMin}
                 setIntervalMin={setIntervalMin}
+                doubleEliminationInterval={doubleEliminationInterval}
+                setDoubleEliminationInterval={setDoubleEliminationInterval}
                 lunchDurationMin={lunchDurationMin}
                 setLunchDurationMin={setLunchDurationMin}
                 desiredLunchTime={desiredLunchTime}
                 setDesiredLunchTime={setDesiredLunchTime}
                 onGenerate={generate}
-                onClearAll={() => clearAllScheduleData.mutate()}
                 status={status}
                 alliances={alliances}
               />
@@ -688,7 +708,7 @@ export default function ScheduleRoute() {
           {user && (
             <TabsContent
               value="generated"
-              className="flex-1 flex flex-col space-y-4"
+              className="flex-1 flex flex-col space-y-6"
             >
               <RoundRobinSchedule
                 generatedBlocks={generatedBlocks}
@@ -696,7 +716,6 @@ export default function ScheduleRoute() {
                 setExpandedRounds={setExpandedRounds}
                 onSave={save}
                 onToggleRound={toggleRound}
-                allianceName={allianceName}
                 isSaving={saveMatches.isPending}
               />
             </TabsContent>
@@ -714,30 +733,12 @@ export default function ScheduleRoute() {
               transformedExistingSchedule={transformedExistingSchedule}
               expandedRounds={expandedRounds}
               onToggleRound={toggleRound}
-              allianceName={allianceName}
             />
           </TabsContent>
-
-          {/* Double Elimination Tab - Only show if user is logged in */}
-          {user && (
-            <TabsContent
-              value="double-elimination"
-              className="flex-1 flex flex-col space-y-4"
-            >
-              <DoubleEliminationTournament
-                doubleEliminationBracket={doubleEliminationBracket}
-                allianceRankings={allianceRankings}
-                doubleEliminationStartTime={doubleEliminationStartTime}
-                setDoubleEliminationStartTime={setDoubleEliminationStartTime}
-                doubleEliminationInterval={doubleEliminationInterval}
-                setDoubleEliminationInterval={setDoubleEliminationInterval}
-                onGenerate={generateDoubleElimination}
-                status={status}
-                allianceName={allianceName}
-              />
-            </TabsContent>
-          )}
         </Tabs>
+
+        {/* Stats Summary */}
+        {user && stats && <ScheduleStatistics stats={stats} />}
       </div>
     </TooltipProvider>
   );

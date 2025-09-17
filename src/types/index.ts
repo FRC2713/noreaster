@@ -2,8 +2,8 @@
 export interface DatabaseMatch {
   id: string;
   name: string | null;
-  red_alliance_id: string;
-  blue_alliance_id: string;
+  red_alliance_id: string | null;
+  blue_alliance_id: string | null;
   scheduled_at: string | null;
   red_score: number | null;
   blue_score: number | null;
@@ -17,6 +17,7 @@ export interface DatabaseMatch {
   blue_barge_rp: boolean;
   round?: number;
   match_number?: number;
+  match_type: 'round_robin' | 'playoff';
   red?: { name: string } | { name: string }[] | null;
   blue?: { name: string } | { name: string }[] | null;
 }
@@ -41,6 +42,18 @@ export interface DatabaseAllianceTeam {
   team_id: string;
   slot: number;
 }
+// Type for database schedule records
+export type DatabaseScheduleBlock = {
+  id: string;
+  start_time: string;
+  end_time: string | null;
+  name: string;
+  description: string | null;
+  type: string;
+  created_at: string;
+  updated_at: string;
+  match_ids: string[] | null;
+};
 
 // Hydrated types (with joined data)
 export interface HydratedAlliance {
@@ -69,8 +82,8 @@ export interface AllianceLite {
 }
 
 export interface MatchLite {
-  red_alliance_id: string;
-  blue_alliance_id: string;
+  red_alliance_id: string | null;
+  blue_alliance_id: string | null;
   red_score: number | null;
   blue_score: number | null;
   red_auto_score: number | null;
@@ -84,13 +97,15 @@ export interface MatchLite {
 }
 
 // Schedule types
-export interface GeneratedMatch {
-  id: string;
-  red_alliance_id: string;
-  blue_alliance_id: string;
-  scheduled_at: Date;
-  round: number;
-}
+export type GeneratedMatch = Pick<
+  DatabaseMatch,
+  | 'id'
+  | 'red_alliance_id'
+  | 'blue_alliance_id'
+  | 'scheduled_at'
+  | 'round'
+  | 'match_type'
+>;
 
 export interface RoundRobinRound {
   type: 'matches';
@@ -103,29 +118,18 @@ export interface LunchBreak {
   duration: number;
 }
 
-export type ScheduleBlock<T extends RoundRobinRound | LunchBreak> = {
-  startTime: string;
-  activity: T;
-};
-
 // Double Elimination Tournament types
-export interface DoubleEliminationMatch {
-  id: string;
-  red_alliance_id: string;
-  blue_alliance_id: string;
-  scheduled_at: Date;
-  round: number;
-  bracket: 'winners' | 'losers';
+export type DoubleEliminationMatch = GeneratedMatch & {
+  bracket: 'upper' | 'lower';
   match_number: number;
   winner_advances_to?: string; // ID of next match
-  loser_advances_to?: string; // ID of next match (for losers bracket)
-}
+  loser_advances_to?: string; // ID of next match (for lower bracket)
+};
 
 export interface DoubleEliminationRound {
-  type: 'matches';
+  type: 'playoffs';
   matches: DoubleEliminationMatch[];
   round: number;
-  bracket: 'winners' | 'losers';
   description: string;
 }
 
@@ -140,9 +144,13 @@ export interface AllianceRanking {
 }
 
 export interface DoubleEliminationBracket {
-  winners_bracket: DoubleEliminationRound[];
-  losers_bracket: DoubleEliminationRound[];
-  finals: DoubleEliminationMatch[];
-  total_rounds: number;
-  total_matches: number;
+  matches: DoubleEliminationMatch[];
 }
+
+export type ScheduleBlock<
+  T extends RoundRobinRound | LunchBreak | DoubleEliminationRound
+> = {
+  startTime: string;
+  duration: number;
+  activity: T;
+};

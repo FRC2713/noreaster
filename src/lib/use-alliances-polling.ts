@@ -1,12 +1,16 @@
-import type { DatabaseAllianceTeam, DatabaseTeam, HydratedAlliance } from '@/types';
+import type {
+  DatabaseAllianceTeam,
+  DatabaseTeam,
+  HydratedAlliance,
+} from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase/client';
 
 async function fetchAlliances() {
   const { data, error } = await supabase
-    .from("alliances")
-    .select("id, name, created_at, emblem_image_url")
-    .order("created_at", { ascending: true });
+    .from('alliances')
+    .select('id, name, created_at, emblem_image_url')
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return data || [];
@@ -14,8 +18,8 @@ async function fetchAlliances() {
 
 async function fetchTeams() {
   const { data, error } = await supabase
-    .from("teams")
-    .select("id, number, name, robot_image_url");
+    .from('teams')
+    .select('id, number, name, robot_image_url');
 
   if (error) throw error;
   return data || [];
@@ -23,19 +27,19 @@ async function fetchTeams() {
 
 async function fetchAllianceTeams() {
   const { data, error } = await supabase
-    .from("alliance_teams")
-    .select("id, alliance_id, team_id, slot");
+    .from('alliance_teams')
+    .select('id, alliance_id, team_id, slot');
 
   if (error) throw error;
   return data || [];
 }
 
 export function useAlliancesPolling() {
-  const { 
-    data: alliances = [], 
-    isLoading: alliancesLoading, 
-    error: alliancesError, 
-    dataUpdatedAt: alliancesUpdatedAt 
+  const {
+    data: alliances = [],
+    isLoading: alliancesLoading,
+    error: alliancesError,
+    dataUpdatedAt: alliancesUpdatedAt,
   } = useQuery({
     queryKey: ['alliances', 'polling'],
     queryFn: fetchAlliances,
@@ -45,10 +49,10 @@ export function useAlliancesPolling() {
     gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
   });
 
-  const { 
-    data: teams = [], 
-    isLoading: teamsLoading, 
-    error: teamsError
+  const {
+    data: teams = [],
+    isLoading: teamsLoading,
+    error: teamsError,
   } = useQuery({
     queryKey: ['teams', 'polling'],
     queryFn: fetchTeams,
@@ -58,11 +62,11 @@ export function useAlliancesPolling() {
     gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
   });
 
-  const { 
-    data: allianceTeams = [], 
-    isLoading: allianceTeamsLoading, 
-    error: allianceTeamsError, 
-    dataUpdatedAt: allianceTeamsUpdatedAt 
+  const {
+    data: allianceTeams = [],
+    isLoading: allianceTeamsLoading,
+    error: allianceTeamsError,
+    dataUpdatedAt: allianceTeamsUpdatedAt,
   } = useQuery({
     queryKey: ['alliance_teams', 'polling'],
     queryFn: fetchAllianceTeams,
@@ -82,23 +86,45 @@ export function useAlliancesPolling() {
   }));
 
   const teamMap = new Map(teams.map(team => [team.id, team]));
-  
+
   allianceTeams.forEach((allianceTeam: DatabaseAllianceTeam) => {
-    const allianceIndex = hydratedAlliances.findIndex(a => a.id === allianceTeam.alliance_id);
-    if (allianceIndex !== -1 && allianceTeam.slot >= 1 && allianceTeam.slot <= 4) {
-      hydratedAlliances[allianceIndex].teams[allianceTeam.slot - 1] = teamMap.get(allianceTeam.team_id) ?? null;
+    const allianceIndex = hydratedAlliances.findIndex(
+      a => a.id === allianceTeam.alliance_id
+    );
+    if (
+      allianceIndex !== -1 &&
+      allianceTeam.slot >= 1 &&
+      allianceTeam.slot <= 4
+    ) {
+      hydratedAlliances[allianceIndex].teams[allianceTeam.slot - 1] =
+        teamMap.get(allianceTeam.team_id) ?? null;
     }
   });
 
   const isLoading = alliancesLoading || teamsLoading || allianceTeamsLoading;
   const error = alliancesError || teamsError || allianceTeamsError;
-  const lastUpdated = Math.max(alliancesUpdatedAt || 0, allianceTeamsUpdatedAt || 0);
+  const lastUpdated = Math.max(
+    alliancesUpdatedAt || 0,
+    allianceTeamsUpdatedAt || 0
+  );
+
+  const getAllianceName = (allianceId: string | null): string => {
+    if (!allianceId) return 'TBD';
+    return (
+      alliances.find(a => a.id === allianceId)?.name ?? `Alliance ${allianceId}`
+    );
+  };
 
   return {
     alliances: hydratedAlliances,
     teams,
     isLoading,
-    error: error ? (error instanceof Error ? error.message : 'Failed to fetch alliances data') : null,
+    error: error
+      ? error instanceof Error
+        ? error.message
+        : 'Failed to fetch alliances data'
+      : null,
     lastUpdated: lastUpdated ? new Date(lastUpdated) : null,
+    getAllianceName,
   };
 }

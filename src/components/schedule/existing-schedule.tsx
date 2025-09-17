@@ -5,22 +5,24 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { MatchesBlock } from '@/components/matches-block';
+import { MatchesBlock } from '@/components/schedule/matches-block';
 import { formatTime } from '@/lib/utils';
 import type {
   RoundRobinRound,
   LunchBreak,
   ScheduleBlock,
 } from '@/lib/schedule-generator';
+import type { DoubleEliminationRound } from '@/types';
 
 interface ExistingScheduleProps {
   scheduleError: Error | null;
   hasExistingData: boolean;
   scheduleLoading: boolean;
-  transformedExistingSchedule: ScheduleBlock<RoundRobinRound | LunchBreak>[];
+  transformedExistingSchedule: ScheduleBlock<
+    RoundRobinRound | LunchBreak | DoubleEliminationRound
+  >[];
   expandedRounds: Set<number>;
   onToggleRound: (roundIndex: number) => void;
-  allianceName: (allianceId: string) => string;
 }
 
 export function ExistingSchedule({
@@ -30,7 +32,6 @@ export function ExistingSchedule({
   transformedExistingSchedule,
   expandedRounds,
   onToggleRound,
-  allianceName,
 }: ExistingScheduleProps) {
   if (scheduleError) {
     return (
@@ -83,7 +84,13 @@ export function ExistingSchedule({
                 blockIndex={blockIndex}
                 isExpanded={expandedRounds.has(blockIndex)}
                 onToggle={onToggleRound}
-                allianceName={allianceName}
+              />
+            ) : block.activity.type === 'playoffs' ? (
+              <MatchesBlock
+                block={block}
+                blockIndex={blockIndex}
+                isExpanded={expandedRounds.has(blockIndex)}
+                onToggle={onToggleRound}
               />
             ) : (
               <Card>

@@ -95,6 +95,7 @@ export function generateSchedule(
   for (let round = 0; round < config.rrRounds; round++) {
     const thisRound: ScheduleBlock<RoundRobinRound> = {
       startTime: currentTime.toISOString(),
+      duration: allPairings.length * parseInt(config.intervalMin),
       activity: {
         type: 'matches',
         round: round,
@@ -117,6 +118,7 @@ export function generateSchedule(
         blue_alliance_id: blueAlliance.id,
         scheduled_at: new Date(currentTime),
         round: round + 1,
+        match_type: 'round_robin',
       };
 
       thisRound.activity.matches.push(match);
@@ -146,6 +148,7 @@ export function generateSchedule(
       // Insert lunch break before this round
       blocks.push({
         startTime: roundStartTime.toISOString(),
+        duration: config.lunchDurationMin,
         activity: {
           type: 'lunch',
           duration: config.lunchDurationMin,
@@ -183,6 +186,7 @@ export function generateSchedule(
 
     blocks.push({
       startTime: lastRoundEndTime.toISOString(),
+      duration: config.lunchDurationMin,
       activity: {
         type: 'lunch',
         duration: config.lunchDurationMin,

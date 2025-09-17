@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -110,8 +110,16 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-html, body, #root { height: 100%; }
-body { margin: 0; background: var(--color-background); color: var(--color-foreground); }
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
 
 @layer base {
   * {

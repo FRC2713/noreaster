@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
+import { Toaster } from '@/components/ui/sonner';
 
 function AppLayout() {
   return (
@@ -14,6 +15,7 @@ function AppLayout() {
           <Outlet />
         </div>
       </main>
+      <Toaster position="bottom-right" className="pointer-events-auto" />
     </SidebarProvider>
   );
 }

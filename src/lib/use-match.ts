@@ -26,6 +26,7 @@ async function fetchMatch(matchId: string): Promise<Match | null> {
       blue_barge_rp,
       round,
       match_number,
+      match_type,
       red:alliances!matches_red_alliance_id_fkey(name), 
       blue:alliances!matches_blue_alliance_id_fkey(name)
     `

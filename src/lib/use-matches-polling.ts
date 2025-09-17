@@ -1,7 +1,8 @@
+import type { DatabaseMatch } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase/client';
 
-async function fetchMatches() {
+async function fetchMatches(): Promise<DatabaseMatch[]> {
   const { data, error } = await supabase
     .from('matches')
     .select(
@@ -23,6 +24,7 @@ async function fetchMatches() {
       blue_barge_rp,
       round,
       match_number,
+      match_type,
       red:alliances!matches_red_alliance_id_fkey(name), 
       blue:alliances!matches_blue_alliance_id_fkey(name)
     `

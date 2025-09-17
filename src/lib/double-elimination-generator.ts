@@ -1,326 +1,221 @@
+import { v4 as uuidv4 } from 'uuid';
 import type {
-  AllianceRanking,
   DoubleEliminationBracket,
   DoubleEliminationMatch,
-  DoubleEliminationRound,
-} from '@/types';
-import { v4 } from 'uuid';
+} from '../types';
+import { type BracketMatch, BracketManager } from './optimized-bracket';
 
-export type {
-  AllianceRanking,
-  DoubleEliminationBracket,
-  DoubleEliminationMatch,
-  DoubleEliminationRound,
-};
+let bracketManager: BracketManager;
 
-/**
- * Generates a double elimination tournament bracket
- */
 export function generateDoubleEliminationBracket(
-  rankings: AllianceRanking[],
+  numAlliances: number,
   startTime: Date,
   intervalMinutes: number
 ): DoubleEliminationBracket {
-  const numAlliances = rankings.length;
+  // Validate input
   if (numAlliances < 2) {
     throw new Error(
-      'Need at least 2 alliances for double elimination tournament'
+      'At least 2 alliances are required for a double elimination tournament'
     );
   }
 
-  const winnersBracket: DoubleEliminationRound[] = [];
-  const losersBracket: DoubleEliminationRound[] = [];
+  // Generate alliance IDs
+  const allianceIds = generateAllianceList(numAlliances);
 
-  let currentTime = new Date(startTime);
-  let matchCounter = 1;
+  bracketManager = new BracketManager(numAlliances);
+  // Get all matches from the optimized bracket
+  const allMatches = bracketManager.getMatches();
 
-  // Generate winners bracket
-  const winnersRounds = Math.ceil(Math.log2(numAlliances));
-  const winnersMatches = generateWinnersBracket(
-    rankings,
-    winnersRounds,
-    currentTime,
-    intervalMinutes,
-    matchCounter
+  // Convert optimized bracket matches to DoubleEliminationMatch format
+  const convertedMatches = allMatches.map((match, index) =>
+    convertOptimizedMatchToDoubleElimination(
+      match,
+      startTime,
+      intervalMinutes,
+      index,
+      allianceIds
+    )
   );
-
-  // Update time and match counter
-  currentTime = new Date(winnersMatches.endTime);
-  matchCounter = winnersMatches.nextMatchNumber;
-
-  // Generate losers bracket
-  const losersRounds = (winnersRounds - 1) * 2;
-  const losersMatches = generateLosersBracket(
-    rankings,
-    losersRounds,
-    currentTime,
-    intervalMinutes,
-    matchCounter
-  );
-
-  // Update time and match counter
-  currentTime = new Date(losersMatches.endTime);
-  matchCounter = losersMatches.nextMatchNumber;
-
-  // Generate finals
-  const finalsMatches = generateFinals(
-    currentTime,
-    intervalMinutes,
-    matchCounter
-  );
-
-  // Group matches into rounds
-  const winnersRoundsMap = new Map<number, DoubleEliminationMatch[]>();
-  winnersMatches.matches.forEach(match => {
-    if (!winnersRoundsMap.has(match.round)) {
-      winnersRoundsMap.set(match.round, []);
-    }
-    winnersRoundsMap.get(match.round)!.push(match);
-  });
-
-  winnersRoundsMap.forEach((matches, round) => {
-    winnersBracket.push({
-      type: 'matches',
-      matches,
-      round,
-      bracket: 'winners',
-      description: `Winners Bracket - Round ${round}`,
-    });
-  });
-
-  const losersRoundsMap = new Map<number, DoubleEliminationMatch[]>();
-  losersMatches.matches.forEach(match => {
-    if (!losersRoundsMap.has(match.round)) {
-      losersRoundsMap.set(match.round, []);
-    }
-    losersRoundsMap.get(match.round)!.push(match);
-  });
-
-  losersRoundsMap.forEach((matches, round) => {
-    losersBracket.push({
-      type: 'matches',
-      matches,
-      round,
-      bracket: 'losers',
-      description: `Losers Bracket - Round ${round}`,
-    });
-  });
 
   return {
-    winners_bracket: winnersBracket,
-    losers_bracket: losersBracket,
-    finals: finalsMatches,
-    total_rounds: winnersRounds + losersRounds + 2, // +2 for finals
-    total_matches:
-      winnersMatches.matches.length +
-      losersMatches.matches.length +
-      finalsMatches.length,
+    matches: convertedMatches,
   };
 }
 
-interface BracketGenerationResult {
-  matches: DoubleEliminationMatch[];
-  endTime: Date;
-  nextMatchNumber: number;
+function generateAllianceList(numAlliances: number): (string | null)[] {
+  const allianceIds: (string | null)[] = [];
+
+  // Add real alliances - these will be actual alliance IDs from the database
+  // For now, we'll use null as placeholders since we don't have real alliance IDs yet
+  for (let i = 0; i < numAlliances; i++) {
+    allianceIds.push(null);
+  }
+
+  return allianceIds;
 }
 
-function generateWinnersBracket(
-  rankings: AllianceRanking[],
-  rounds: number,
-  startTime: Date,
-  intervalMinutes: number,
-  startMatchNumber: number
-): BracketGenerationResult {
-  const matches: DoubleEliminationMatch[] = [];
-  const currentTime = new Date(startTime);
-  let matchNumber = startMatchNumber;
+// Utility function to get the winner of a match
+export function getMatchWinner(
+  redAllianceId: string | null,
+  blueAllianceId: string | null
+): 'red' | 'blue' | null {
+  if (!redAllianceId || !blueAllianceId) return null;
 
-  // First round - all alliances play with proper seeding
-  // #1 vs #last, #2 vs #second-to-last, etc.
-  // If odd number of teams, #1 gets a bye
-  const isOdd = rankings.length % 2 === 1;
-  const firstRoundMatches = Math.floor(rankings.length / 2);
-  const firstRoundAlliances = [...rankings];
+  // Actual match result needed - this would be determined by the tournament management system
+  return null;
+}
 
-  // If odd number, skip the #1 seed (they get a bye)
-  const startIndex = isOdd ? 1 : 0;
+function assignAlliancesToMatch(
+  match: BracketMatch,
+  allianceIds: (string | null)[]
+): { redAllianceId: string | null; blueAllianceId: string | null } {
+  // For initial matches (round 1), assign alliances based on rank
+  if (match.round === 1) {
+    const redRank = Math.abs(match.redFrom) - 1; // Convert to 0-based index
+    const blueRank = Math.abs(match.blueFrom) - 1; // Convert to 0-based index
 
-  for (let i = 0; i < firstRoundMatches; i++) {
-    const topSeed = firstRoundAlliances[startIndex + i];
-    const bottomSeed = firstRoundAlliances[firstRoundAlliances.length - 1 - i];
-
-    const match: DoubleEliminationMatch = {
-      id: v4(),
-      red_alliance_id: topSeed.alliance_id,
-      blue_alliance_id: bottomSeed.alliance_id,
-      scheduled_at: new Date(currentTime),
-      round: 1,
-      bracket: 'winners',
-      match_number: matchNumber++,
+    return {
+      redAllianceId: allianceIds[redRank] || null,
+      blueAllianceId: allianceIds[blueRank] || null,
     };
-
-    matches.push(match);
-    currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
   }
 
-  // If odd number of teams, #1 seed gets a bye and advances automatically
-  if (isOdd) {
-    // The #1 seed automatically advances to the next round
-    // No match is created for them in the first round
-  }
-
-  // Subsequent rounds
-  let remainingAlliances = firstRoundAlliances.length;
-  for (let round = 2; round <= rounds; round++) {
-    const matchesThisRound = Math.ceil(remainingAlliances / 2);
-    remainingAlliances = Math.ceil(remainingAlliances / 2);
-
-    for (let i = 0; i < matchesThisRound; i++) {
-      const match: DoubleEliminationMatch = {
-        id: v4(),
-        red_alliance_id: '', // Will be filled by winner of previous round
-        blue_alliance_id: '', // Will be filled by winner of previous round
-        scheduled_at: new Date(currentTime),
-        round,
-        bracket: 'winners',
-        match_number: matchNumber++,
-      };
-
-      matches.push(match);
-      currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
-    }
-  }
-
+  // For subsequent matches, we can't determine alliances until previous matches are played
+  // This would typically be handled by the tournament management system
   return {
-    matches,
-    endTime: new Date(currentTime),
-    nextMatchNumber: matchNumber,
+    redAllianceId: null,
+    blueAllianceId: null,
   };
 }
 
-function generateLosersBracket(
-  rankings: AllianceRanking[],
-  rounds: number,
+function convertOptimizedMatchToDoubleElimination(
+  match: BracketMatch,
   startTime: Date,
   intervalMinutes: number,
-  startMatchNumber: number
-): BracketGenerationResult {
-  const matches: DoubleEliminationMatch[] = [];
-  const currentTime = new Date(startTime);
-  let matchNumber = startMatchNumber;
+  matchIndex: number,
+  allianceIds: (string | null)[]
+): DoubleEliminationMatch {
+  const scheduledTime = new Date(startTime);
+  scheduledTime.setMinutes(
+    scheduledTime.getMinutes() + matchIndex * intervalMinutes
+  );
 
-  // Losers bracket is more complex - teams drop down from winners bracket
-  // For simplicity, we'll create a basic structure
-  for (let round = 1; round <= rounds; round++) {
-    const matchesThisRound = Math.max(
-      1,
-      Math.floor(rankings.length / Math.pow(2, round))
-    );
+  // Convert bracket type
+  const bracket = match.bracket === 0 ? 'upper' : 'lower';
 
-    for (let i = 0; i < matchesThisRound; i++) {
-      const match: DoubleEliminationMatch = {
-        id: v4(),
-        red_alliance_id: '', // Will be filled by loser from winners bracket
-        blue_alliance_id: '', // Will be filled by winner from previous losers bracket
-        scheduled_at: new Date(currentTime),
-        round,
-        bracket: 'losers',
-        match_number: matchNumber++,
-      };
+  // Generate match ID based on the optimized bracket structure
+  const matchId = generateMatchId();
 
-      matches.push(match);
-      currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
-    }
-  }
+  // Assign alliances based on bracket structure
+  const { redAllianceId, blueAllianceId } = assignAlliancesToMatch(
+    match,
+    allianceIds
+  );
+
+  // Determine advancement paths
+  const winnerAdvancesTo = getWinnerAdvancement();
+  const loserAdvancesTo = getLoserAdvancement();
 
   return {
-    matches,
-    endTime: new Date(currentTime),
-    nextMatchNumber: matchNumber,
+    id: matchId,
+    red_alliance_id: redAllianceId,
+    blue_alliance_id: blueAllianceId,
+    scheduled_at: scheduledTime.toISOString(),
+    round: match.round,
+    match_type: 'playoff',
+    bracket: bracket,
+    match_number: match.matchNumber,
+    winner_advances_to: winnerAdvancesTo,
+    loser_advances_to: loserAdvancesTo,
   };
 }
 
-function generateFinals(
-  startTime: Date,
-  intervalMinutes: number,
-  startMatchNumber: number
-): DoubleEliminationMatch[] {
-  const matches: DoubleEliminationMatch[] = [];
-  const currentTime = new Date(startTime);
-  let matchNumber = startMatchNumber;
-
-  // Best of 3 finals series
-  for (let game = 1; game <= 3; game++) {
-    const finalsMatch: DoubleEliminationMatch = {
-      id: v4(),
-      red_alliance_id: '', // Winners bracket winner
-      blue_alliance_id: '', // Losers bracket winner
-      scheduled_at: new Date(currentTime),
-      round: game,
-      bracket: 'winners',
-      match_number: matchNumber++,
-    };
-
-    matches.push(finalsMatch);
-    currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
-  }
-
-  return matches;
+function generateMatchId(): string {
+  // Generate a proper UUID for the match ID
+  // The database expects UUIDs, not string-based IDs
+  return uuidv4();
 }
 
-/**
- * Converts double elimination bracket to schedule blocks
- */
-export function convertBracketToScheduleBlocks(
-  bracket: DoubleEliminationBracket,
-  startTime: Date,
-  intervalMinutes: number
-): Array<{ startTime: string; activity: DoubleEliminationRound }> {
-  const blocks: Array<{ startTime: string; activity: DoubleEliminationRound }> =
-    [];
-  const currentTime = new Date(startTime);
+function getWinnerAdvancement(): string | undefined {
+  // For now, we'll set advancement to undefined since we're generating random UUIDs
+  // and can't predict target match IDs. This can be enhanced later to properly
+  // link matches after they're all generated.
+  return undefined;
+}
 
-  // Add winners bracket rounds
-  bracket.winners_bracket.forEach(round => {
-    blocks.push({
-      startTime: currentTime.toISOString(),
-      activity: round,
-    });
+function getLoserAdvancement(): string | undefined {
+  // For now, we'll set advancement to undefined since we're generating random UUIDs
+  // and can't predict target match IDs. This can be enhanced later to properly
+  // link matches after they're all generated.
+  return undefined;
+}
 
-    // Advance time by the number of matches in this round
-    currentTime.setMinutes(
-      currentTime.getMinutes() + round.matches.length * intervalMinutes
-    );
-  });
+// Utility function to get bracket structure information
+export function getBracketStructure(): {
+  totalMatches: number;
+  upperBracketRounds: number;
+  lowerBracketRounds: number;
+  finalsMatches: number;
+  matchFlow: Array<{
+    matchId: string;
+    round: number;
+    bracket: 'upper' | 'lower' | 'finals';
+    redFrom: string;
+    blueFrom: string;
+    redWinGoesTo: string;
+    redLossGoesTo: string;
+    blueWinGoesTo: string;
+    blueLossGoesTo: string;
+  }>;
+} {
+  const allMatches = Array.from(bracketManager['bracket'].matches.values());
 
-  // Add losers bracket rounds
-  bracket.losers_bracket.forEach(round => {
-    blocks.push({
-      startTime: currentTime.toISOString(),
-      activity: round,
-    });
+  const matchFlow = allMatches.map(match => {
+    const matchId = generateMatchId();
+    const bracket = match.bracket === 0 ? 'upper' : 'lower';
 
-    // Advance time by the number of matches in this round
-    currentTime.setMinutes(
-      currentTime.getMinutes() + round.matches.length * intervalMinutes
-    );
-  });
-
-  // Add finals
-  if (bracket.finals.length > 0) {
-    const finalsRound: DoubleEliminationRound = {
-      type: 'matches',
-      matches: bracket.finals,
-      round: bracket.winners_bracket.length + bracket.losers_bracket.length + 1,
-      bracket: 'winners',
-      description: 'Finals',
+    return {
+      matchId,
+      round: match.round,
+      bracket: (match.id >= 14 ? 'finals' : bracket) as
+        | 'upper'
+        | 'lower'
+        | 'finals',
+      redFrom:
+        match.redFrom < 0
+          ? `Rank ${Math.abs(match.redFrom)}`
+          : `Match ${match.redFrom}`,
+      blueFrom:
+        match.blueFrom < 0
+          ? `Rank ${Math.abs(match.blueFrom)}`
+          : `Match ${match.blueFrom}`,
+      redWinGoesTo: formatAdvancement(match.redAdvancement.win),
+      redLossGoesTo: formatAdvancement(match.redAdvancement.loss),
+      blueWinGoesTo: formatAdvancement(match.blueAdvancement.win),
+      blueLossGoesTo: formatAdvancement(match.blueAdvancement.loss),
     };
+  });
 
-    blocks.push({
-      startTime: currentTime.toISOString(),
-      activity: finalsRound,
-    });
-  }
+  const upperBracketRounds = Math.max(
+    ...allMatches.filter(m => m.bracket === 0).map(m => m.round)
+  );
+  const lowerBracketRounds = Math.max(
+    ...allMatches.filter(m => m.bracket === 1).map(m => m.round)
+  );
+  const finalsMatches = allMatches.filter(m => m.id >= 14).length;
 
-  return blocks;
+  return {
+    totalMatches: allMatches.length,
+    upperBracketRounds,
+    lowerBracketRounds,
+    finalsMatches,
+    matchFlow,
+  };
+}
+
+function formatAdvancement(advancement: unknown): string {
+  if (advancement === 'champion') return 'Championship';
+  if (advancement === 'eliminated') return 'Eliminated';
+  if (typeof advancement === 'number') return `Match ${advancement}`;
+  return 'Unknown';
 }

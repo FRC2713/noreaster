@@ -20,11 +20,13 @@ export default function LiveRoute() {
         match.red_score !== null &&
         match.red_score !== undefined &&
         match.blue_score !== null &&
-        match.blue_score !== undefined
+        match.blue_score !== undefined &&
+        match.scheduled_at !== null
     )
     .sort(
       (a, b) =>
-        new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
+        new Date(b.scheduled_at!).getTime() -
+        new Date(a.scheduled_at!).getTime()
     )
     .slice(0, 5);
 
@@ -35,11 +37,13 @@ export default function LiveRoute() {
           match.red_score === undefined ||
           match.blue_score === null ||
           match.blue_score === undefined) &&
+        match.scheduled_at !== null &&
         new Date(match.scheduled_at) > now
     )
     .sort(
       (a, b) =>
-        new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+        new Date(a.scheduled_at!).getTime() -
+        new Date(b.scheduled_at!).getTime()
     );
 
   // Determine which matches to show on the right
@@ -100,6 +104,7 @@ export default function LiveRoute() {
                           match.red_score === undefined ||
                           match.blue_score === null ||
                           match.blue_score === undefined) &&
+                        match.scheduled_at !== null &&
                         new Date(match.scheduled_at) > now;
                       const isRecent = playedMatches.includes(match);
                       const isNextMatch =
@@ -180,6 +185,7 @@ export default function LiveRoute() {
                           match.red_score === undefined ||
                           match.blue_score === null ||
                           match.blue_score === undefined) &&
+                        match.scheduled_at !== null &&
                         new Date(match.scheduled_at) > now;
                       const isRecent = playedMatches.includes(match);
                       const isNextMatch =
@@ -270,6 +276,7 @@ export default function LiveRoute() {
                         match.red_score === undefined ||
                         match.blue_score === null ||
                         match.blue_score === undefined) &&
+                      match.scheduled_at !== null &&
                       new Date(match.scheduled_at) > now;
                     const isRecent = playedMatches.includes(match);
                     const isNextMatch =
