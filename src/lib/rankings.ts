@@ -63,6 +63,7 @@ export function computeRankings(
   };
 
   for (const m of matches) {
+    if (!m.red_alliance_id || !m.blue_alliance_id) continue;
     const red = idToStats.get(m.red_alliance_id);
     const blue = idToStats.get(m.blue_alliance_id);
     if (!red || !blue) continue;

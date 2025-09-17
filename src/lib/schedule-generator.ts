@@ -116,7 +116,7 @@ export function generateSchedule(
         id: v4(),
         red_alliance_id: redAlliance.id,
         blue_alliance_id: blueAlliance.id,
-        scheduled_at: new Date(currentTime),
+        scheduled_at: new Date(currentTime).toISOString(),
         round: round + 1,
         match_type: 'round_robin',
       };
@@ -168,7 +168,7 @@ export function generateSchedule(
         matchTime.setMinutes(
           matchTime.getMinutes() + matchIndex * parseInt(config.intervalMin)
         );
-        match.scheduled_at = matchTime;
+        match.scheduled_at = matchTime.toISOString();
       });
     }
 
@@ -294,6 +294,8 @@ export function calculateScheduleStats(
   const timesByAlliance = new Map<string, number[]>();
 
   for (const g of generated) {
+    if (!g.red_alliance_id || !g.blue_alliance_id) continue;
+
     // Count total matches per alliance
     perAllianceCount.set(
       g.red_alliance_id,
@@ -317,7 +319,9 @@ export function calculateScheduleStats(
     // Track times for turnaround calculations
     [g.red_alliance_id, g.blue_alliance_id].forEach(id => {
       const arr = timesByAlliance.get(id) ?? [];
-      arr.push(new Date(g.scheduled_at).getTime());
+      if (g.scheduled_at) {
+        arr.push(new Date(g.scheduled_at).getTime());
+      }
       timesByAlliance.set(id, arr);
     });
   }
@@ -358,7 +362,7 @@ export function calculateScheduleStats(
   }));
 
   const totalMatches = generated.length;
-  const totalRounds = Math.max(...generated.map(m => m.round), 0);
+  const totalRounds = Math.max(...generated.map(m => m.round ?? 0), 0);
   const avgMatchesPerAlliance = rows.length
     ? Number(((totalMatches * 2) / rows.length).toFixed(2))
     : 0;

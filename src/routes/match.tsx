@@ -112,7 +112,8 @@ export default function MatchEditRoute() {
       setStatus(`Save failed: ${e?.message ?? 'Unknown error'}`),
   });
 
-  function allianceName(id: string) {
+  function allianceName(id: string | null) {
+    if (!id) return 'Unknown Alliance';
     return alliances.find(a => a.id === id)?.name ?? id;
   }
 

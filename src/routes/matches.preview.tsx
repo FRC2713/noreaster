@@ -81,7 +81,9 @@ export default function MatchesPreviewRoute() {
 
   const allianceIds = useMemo(() => {
     if (!match) return [] as string[];
-    return [match.red_alliance_id, match.blue_alliance_id];
+    return [match.red_alliance_id, match.blue_alliance_id].filter(
+      (id): id is string => id !== null
+    );
   }, [match]);
 
   const {
@@ -160,7 +162,7 @@ export default function MatchesPreviewRoute() {
             <div className="flex-shrink-0">
               {match && (
                 <AllianceStats
-                  allianceId={match.red_alliance_id}
+                  allianceId={match.red_alliance_id ?? ''}
                   matches={matches}
                   color="red"
                 />
@@ -170,7 +172,9 @@ export default function MatchesPreviewRoute() {
             {/* Red Alliance */}
             <div className="flex-1 text-center">
               <div className="text-3xl md:text-4xl font-bold mb-6 text-white">
-                {allianceNames[match.red_alliance_id] ?? 'Red Alliance'}
+                {match.red_alliance_id
+                  ? allianceNames[match.red_alliance_id] ?? 'Red Alliance'
+                  : 'Red Alliance'}
               </div>
               <div className="flex justify-center gap-4">
                 {redSlots.map((t, idx) => (
@@ -206,7 +210,9 @@ export default function MatchesPreviewRoute() {
             {/* Blue Alliance */}
             <div className="flex-1 text-center">
               <div className="text-3xl md:text-4xl font-bold mb-6 text-white">
-                {allianceNames[match.blue_alliance_id] ?? 'Blue Alliance'}
+                {match.blue_alliance_id
+                  ? allianceNames[match.blue_alliance_id] ?? 'Blue Alliance'
+                  : 'Blue Alliance'}
               </div>
               <div className="flex justify-center gap-4">
                 {blueSlots.map((t, idx) => (
@@ -240,7 +246,7 @@ export default function MatchesPreviewRoute() {
             <div className="flex-shrink-0">
               {match && (
                 <AllianceStats
-                  allianceId={match.blue_alliance_id}
+                  allianceId={match.blue_alliance_id ?? ''}
                   matches={matches}
                   color="blue"
                 />
