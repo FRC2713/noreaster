@@ -22,6 +22,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
   DropdownMenu,
@@ -61,11 +62,6 @@ const navItems = [
     title: 'Rankings',
     url: '/rankings',
     icon: Trophy,
-  },
-  {
-    title: 'Documentation',
-    url: '/docs',
-    icon: BookOpenText,
   },
 ];
 
@@ -114,6 +110,15 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link to="/docs">
+                <BookOpenText className="h-4 w-4" />
+                <span>Documentation</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarSeparator />
+          <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
@@ -123,16 +128,10 @@ export function AppSidebar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 {user ? (
-                  <>
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign out
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <BookOpenText className="h-4 w-4 mr-2" />
-                      <Link to="/docs">Docs</Link>
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem asChild>
                     <Link to="/auth">Sign in</Link>

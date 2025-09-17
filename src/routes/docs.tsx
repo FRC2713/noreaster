@@ -170,6 +170,19 @@ export default function Docs() {
           <CardContent>
             <ScrollArea className="h-[calc(100vh-200px)]">
               <div className="prose prose-sm max-w-none">
+                {/* Temporary AI-generated documentation notice */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-2">
+                    <div className="text-amber-600 text-sm font-medium">
+                      ⚠️ Note:
+                    </div>
+                    <div className="text-amber-800 text-sm">
+                      This documentation is AI-generated and we're working on
+                      making it accurate and complete. Please verify information
+                      and report any inaccuracies.
+                    </div>
+                  </div>
+                </div>
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
