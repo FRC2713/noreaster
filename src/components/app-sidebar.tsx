@@ -8,6 +8,7 @@ import {
   Clock,
   Trophy,
   User as UserIcon,
+  BookOpenText,
   LogOut,
 } from 'lucide-react';
 import {
@@ -61,6 +62,11 @@ const navItems = [
     url: '/rankings',
     icon: Trophy,
   },
+  {
+    title: 'Documentation',
+    url: '/docs',
+    icon: BookOpenText,
+  },
 ];
 
 export function AppSidebar() {
@@ -112,20 +118,19 @@ export function AppSidebar() {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
                   <UserIcon className="h-4 w-4" />
-                  <span>{user ? 'Account' : 'Sign In'}</span>
+                  <span>{user ? user.email : 'Sign In'}</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 {user ? (
                   <>
-                    {user.email && (
-                      <div className="px-2 py-1 text-xs text-muted-foreground truncate">
-                        {user.email}
-                      </div>
-                    )}
                     <DropdownMenuItem onClick={handleSignOut}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Sign out
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <BookOpenText className="h-4 w-4 mr-2" />
+                      <Link to="/docs">Docs</Link>
                     </DropdownMenuItem>
                   </>
                 ) : (

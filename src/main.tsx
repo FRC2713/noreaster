@@ -23,6 +23,7 @@ const Match = lazy(() => import('./routes/match'));
 const Schedule = lazy(() => import('./routes/schedule'));
 const Rankings = lazy(() => import('./routes/rankings'));
 const Live = lazy(() => import('./routes/live'));
+const Docs = lazy(() => import('./routes/docs'));
 
 // Create wrapped components for protected routes
 const ProtectedTeamsNew = withAuth(TeamsNew);
@@ -154,6 +155,14 @@ const router = createBrowserRouter(
           element: (
             <SuspenseWrapper>
               <Rankings />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'docs',
+          element: (
+            <SuspenseWrapper>
+              <Docs />
             </SuspenseWrapper>
           ),
         },
