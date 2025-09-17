@@ -1,4 +1,4 @@
-import{c as _}from"./query-vendor-Cs1Z885O.js";import{s as l}from"./index-DDBma67i.js";async function u(e){const{data:a,error:r}=await l.from("matches").select(`
+import{c as _}from"./query-vendor-DCkfz_My.js";import{s as c}from"./index-CxnTeCY0.js";async function l(e){const{data:r,error:a}=await c.from("matches").select(`
       id, 
       name, 
       red_alliance_id, 
@@ -16,6 +16,7 @@ import{c as _}from"./query-vendor-Cs1Z885O.js";import{s as l}from"./index-DDBma6
       blue_barge_rp,
       round,
       match_number,
+      match_type,
       red:alliances!matches_red_alliance_id_fkey(name), 
       blue:alliances!matches_blue_alliance_id_fkey(name)
-    `).eq("id",e).single();if(r)throw r;return a}function n(e){return _({queryKey:["match",e],queryFn:()=>u(e),enabled:!!e})}export{n as u};
+    `).eq("id",e).single();if(a)throw a;return r}function n(e){return _({queryKey:["match",e],queryFn:()=>l(e),enabled:!!e})}export{n as u};
