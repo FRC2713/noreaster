@@ -1,1 +1,0 @@
-import{j as n}from"./ui-vendor-DO8HNBy7.js";import{c as r}from"./index-CxnTeCY0.js";function m({className:e,children:t}){return n.jsx("span",{className:r("inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-muted text-foreground",e),children:t})}export{m as B};
