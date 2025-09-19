@@ -1,0 +1,22 @@
+import{c as h}from"./query-vendor-BivveeUn.js";import{s as m,c as n}from"./index-BKCnwC9K.js";import{j as e,x as l,y as b}from"./ui-vendor-CDBhOMS0.js";import{r as _}from"./react-vendor-CNeAGCso.js";async function f(a){const{data:r,error:s}=await m.from("matches").select(`
+      id, 
+      name, 
+      red_alliance_id, 
+      blue_alliance_id, 
+      scheduled_at, 
+      red_score, 
+      blue_score, 
+      red_auto_score, 
+      blue_auto_score, 
+      red_coral_rp, 
+      red_auto_rp, 
+      red_barge_rp, 
+      blue_coral_rp, 
+      blue_auto_rp, 
+      blue_barge_rp,
+      round,
+      match_number,
+      match_type,
+      red:alliances!matches_red_alliance_id_fkey(name), 
+      blue:alliances!matches_blue_alliance_id_fkey(name)
+    `).eq("id",a).single();if(s)throw s;return r}function j(a){return h({queryKey:["match",a],queryFn:()=>f(a),enabled:!!a})}const t=_.forwardRef(({className:a,...r},s)=>e.jsx(l,{ref:s,className:n("peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",a),...r,children:e.jsx(b,{className:n("pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0")})}));t.displayName=l.displayName;function k({title:a,coral:r,auto:s,barge:c,onCoralChange:i,onAutoChange:o,onBargeChange:d,className:u}){return e.jsxs("div",{className:`${u??""} border rounded-md p-4`,children:[e.jsx("div",{className:"font-semibold mb-3 text-lg",children:a}),e.jsxs("label",{className:"flex items-center justify-between py-2 text-lg",children:[e.jsx("span",{children:"Coral RP"}),e.jsx(t,{checked:r,onCheckedChange:i})]}),e.jsxs("label",{className:"flex items-center justify-between py-2 text-lg",children:[e.jsx("span",{children:"Auto RP"}),e.jsx(t,{checked:s,onCheckedChange:o})]}),e.jsxs("label",{className:"flex items-center justify-between py-2 text-lg",children:[e.jsx("span",{children:"Barge RP"}),e.jsx(t,{checked:c,onCheckedChange:d})]})]})}export{k as A,j as u};
