@@ -13,9 +13,9 @@ import {
 } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Clock, Play } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { useAlliancesPolling } from '@/lib/use-alliances-polling';
-import { useActionToast } from '@/lib/use-toast';
+import { ScheduleConfigurationSkeleton } from './schedule-skeleton';
 
 interface ScheduleConfigurationProps {
   day: Date;
@@ -32,8 +32,6 @@ interface ScheduleConfigurationProps {
   setLunchDurationMin: (duration: number) => void;
   desiredLunchTime: string;
   setDesiredLunchTime: (time: string) => void;
-  onGenerate: () => void;
-  status: string | null;
   alliances: Array<{ id: string; name: string }>;
 }
 
@@ -52,11 +50,13 @@ export function ScheduleConfiguration({
   setLunchDurationMin,
   desiredLunchTime,
   setDesiredLunchTime,
-  onGenerate,
-  status,
 }: ScheduleConfigurationProps) {
-  const { alliances } = useAlliancesPolling();
-  const { onSuccess } = useActionToast();
+  const { alliances, isLoading } = useAlliancesPolling();
+
+  if (isLoading) {
+    return <ScheduleConfigurationSkeleton />;
+  }
+
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-4 w-full">
@@ -227,33 +227,6 @@ export function ScheduleConfiguration({
           </CardContent>
         </Card>
       </div>
-
-      {/* Actions */}
-
-      <Card>
-        <CardContent className="space-y-6">
-          <div className="flex gap-4">
-            <Button
-              onClick={() => {
-                onSuccess('Schedule generation');
-                onGenerate();
-              }}
-              size="lg"
-              className="px-6"
-            >
-              <Play className="mr-2 h-4 w-4" />
-              Generate Schedule
-            </Button>
-          </div>
-
-          {/* Status Display */}
-          {status && (
-            <div className="mt-4 p-3 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">{status}</div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </>
   );
 }

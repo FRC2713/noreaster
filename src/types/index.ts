@@ -22,6 +22,12 @@ export interface DatabaseMatch {
   blue?: { name: string } | { name: string }[] | null;
 }
 
+// Optimized match type with pre-loaded alliance data
+export interface MatchWithAlliances extends DatabaseMatch {
+  redAlliance?: DatabaseAlliance | null;
+  blueAlliance?: DatabaseAlliance | null;
+}
+
 export interface DatabaseAlliance {
   id: string;
   name: string;
@@ -34,6 +40,21 @@ export interface DatabaseTeam {
   number: number;
   name: string;
   robot_image_url: string | null;
+}
+
+// Match details specific types
+export interface AllianceTeamRow {
+  alliance_id: string;
+  team_id: string;
+  slot: number;
+}
+
+export interface MatchDetailsData {
+  match: DatabaseMatch;
+  redAllianceName: string;
+  blueAllianceName: string;
+  redSlots: (DatabaseTeam | null)[];
+  blueSlots: (DatabaseTeam | null)[];
 }
 
 export interface DatabaseAllianceTeam {
@@ -138,9 +159,12 @@ export interface AllianceRanking {
   alliance_name: string;
   wins: number;
   losses: number;
+  ties: number;
   win_percentage: number;
   total_matches: number;
   rank: number;
+  avgScore: number;
+  avgRp: number;
 }
 
 export interface DoubleEliminationBracket {

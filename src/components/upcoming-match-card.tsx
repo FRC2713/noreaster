@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock, Calendar } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/supabase/client';
-import type { DatabaseMatch } from '@/types';
+import type { DatabaseMatch, MatchWithAlliances } from '@/types';
 
 function formatRelative(iso: string) {
   const target = new Date(iso).getTime();
@@ -36,60 +35,25 @@ function formatRelative(iso: string) {
   return 'now';
 }
 
-export function UpcomingMatchCard({
+export const UpcomingMatchCard = memo(function UpcomingMatchCard({
   match,
   right,
   showRelativeTime = false,
   dense = false,
 }: {
-  match: DatabaseMatch;
+  match: DatabaseMatch | MatchWithAlliances;
   right?: ReactNode;
   showRelativeTime?: boolean;
   dense?: boolean;
 }) {
-  // Fetch alliance data for both red and blue alliances
-  const { data: redAlliance } = useQuery({
-    queryKey: ['alliances', 'byId', match.red_alliance_id],
-    queryFn: async (): Promise<{
-      id: string;
-      name: string;
-      emblem_image_url: string | null;
-    } | null> => {
-      if (!match.red_alliance_id) return null;
-      const { data, error } = await supabase
-        .from('alliances')
-        .select('id, name, emblem_image_url')
-        .eq('id', match.red_alliance_id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!match.red_alliance_id,
-  });
-
-  const { data: blueAlliance } = useQuery({
-    queryKey: ['alliances', 'byId', match.blue_alliance_id],
-    queryFn: async (): Promise<{
-      id: string;
-      name: string;
-      emblem_image_url: string | null;
-    } | null> => {
-      if (!match.blue_alliance_id) return null;
-      const { data, error } = await supabase
-        .from('alliances')
-        .select('id, name, emblem_image_url')
-        .eq('id', match.blue_alliance_id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!match.blue_alliance_id,
-  });
-
   // Safety check - if match is undefined or null, don't render
   if (!match) {
     return null;
   }
+
+  // Use pre-loaded alliance data if available, otherwise fall back to individual queries
+  const redAlliance = 'redAlliance' in match ? match.redAlliance : null;
+  const blueAlliance = 'blueAlliance' in match ? match.blueAlliance : null;
 
   // Extract alliance names from the match object
   const redName = Array.isArray(match.red)
@@ -334,4 +298,4 @@ export function UpcomingMatchCard({
 
   // Otherwise, return the card content directly
   return cardContent;
-}
+});

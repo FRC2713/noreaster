@@ -19,6 +19,7 @@ interface ScheduleStatisticsProps {
       avgMinutes: number;
       minMinutes: number;
       maxMinutes: number;
+      backToBackMatches: number;
     }>;
     totalMatches: number;
     totalRounds: number;
@@ -86,6 +87,7 @@ export function ScheduleStatistics({ stats }: ScheduleStatisticsProps) {
                     <th className="py-2 pr-4 font-medium text-blue-600">
                       Blue
                     </th>
+                    <th className="py-2 pr-4 font-medium">Back-to-Back</th>
                     <th className="py-2 pr-4 font-medium">Avg Turnaround</th>
                     <th className="py-2 pr-4 font-medium">Range</th>
                   </tr>
@@ -100,6 +102,9 @@ export function ScheduleStatistics({ stats }: ScheduleStatisticsProps) {
                       </td>
                       <td className="py-2 pr-4 text-blue-600 font-medium">
                         {r.blueMatches}
+                      </td>
+                      <td className="py-2 pr-4 text-orange-600 font-medium">
+                        {r.backToBackMatches}
                       </td>
                       <td className="py-2 pr-4">{r.avgMinutes} min</td>
                       <td className="py-2 pr-4 text-muted-foreground">

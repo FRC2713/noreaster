@@ -3,8 +3,8 @@ import type {
   DatabaseTeam,
   HydratedAlliance,
 } from '@/types';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase/client';
+import { useSmartPolling } from './use-smart-polling';
 
 async function fetchAlliances() {
   const { data, error } = await supabase
@@ -40,26 +40,24 @@ export function useAlliancesPolling() {
     isLoading: alliancesLoading,
     error: alliancesError,
     dataUpdatedAt: alliancesUpdatedAt,
-  } = useQuery({
+  } = useSmartPolling({
     queryKey: ['alliances', 'polling'],
     queryFn: fetchAlliances,
-    refetchInterval: 10000, // Poll every 10 seconds
-    refetchIntervalInBackground: true,
-    staleTime: 0, // Always consider data stale to ensure polling
-    gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
+    refetchInterval: 30000, // Base interval: 30 seconds (alliances change less frequently)
+    staleTime: 20000, // Consider data fresh for 20 seconds
+    gcTime: 15 * 60 * 1000, // Keep data in cache for 15 minutes
   });
 
   const {
     data: teams = [],
     isLoading: teamsLoading,
     error: teamsError,
-  } = useQuery({
+  } = useSmartPolling({
     queryKey: ['teams', 'polling'],
     queryFn: fetchTeams,
-    refetchInterval: 10000, // Poll every 10 seconds
-    refetchIntervalInBackground: true,
-    staleTime: 0, // Always consider data stale to ensure polling
-    gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
+    refetchInterval: 60000, // Base interval: 60 seconds (teams change rarely)
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 30 * 60 * 1000, // Keep data in cache for 30 minutes
   });
 
   const {
@@ -67,13 +65,12 @@ export function useAlliancesPolling() {
     isLoading: allianceTeamsLoading,
     error: allianceTeamsError,
     dataUpdatedAt: allianceTeamsUpdatedAt,
-  } = useQuery({
+  } = useSmartPolling({
     queryKey: ['alliance_teams', 'polling'],
     queryFn: fetchAllianceTeams,
-    refetchInterval: 10000, // Poll every 10 seconds
-    refetchIntervalInBackground: true,
-    staleTime: 0, // Always consider data stale to ensure polling
-    gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
+    refetchInterval: 30000, // Base interval: 30 seconds
+    staleTime: 20000, // Consider data fresh for 20 seconds
+    gcTime: 15 * 60 * 1000, // Keep data in cache for 15 minutes
   });
 
   // Hydrate alliances with their teams

@@ -17,7 +17,6 @@ export type ScheduleConfig = {
   intervalMin: string;
   rrRounds: number;
   desiredLunchTime: string;
-  enablePostOptimization?: boolean; // Optional: enable final within-round swapping optimization
 };
 
 export type ScheduleStats = {
@@ -102,7 +101,7 @@ export function generateSchedule(
   // Generate the schedule blocks
   const blocks: ScheduleBlock<RoundRobinRound | LunchBreak>[] = [];
   let lunchInserted = false;
-  const currentTime = new Date(toISODateTime(config.day, config.startTime));
+  let currentTime = new Date(toISODateTime(config.day, config.startTime));
 
   for (let round = 0; round < config.rrRounds; round++) {
     const roundStartTime = new Date(currentTime);
@@ -174,32 +173,6 @@ export function generateSchedule(
     });
   }
 
-  // Final optimization: allow swapping matches within rounds to further reduce back-to-back matches
-  if (config.enablePostOptimization !== false) {
-    // Default to enabled
-    try {
-      const optimizedBlocks = optimizeCompleteSchedule(blocks, alliances);
-      // Validate that the optimization didn't break anything
-      const originalMatches = extractAllMatches(blocks);
-      const optimizedMatches = extractAllMatches(optimizedBlocks);
-
-      if (originalMatches.length === optimizedMatches.length) {
-        return optimizedBlocks;
-      } else {
-        console.warn(
-          'Post-optimization changed match count, reverting to original'
-        );
-        return blocks;
-      }
-    } catch (error) {
-      console.error(
-        'Post-optimization failed, using original schedule:',
-        error
-      );
-      return blocks;
-    }
-  }
-
   return blocks;
 }
 
@@ -250,7 +223,7 @@ function optimizeRoundRobinOrder(
   // Generate multiple candidate orderings
   const candidates = [
     optimizeWithGreedyApproach(basePairings),
-    optimizeWithBalancedApproach(basePairings, alliances, totalRounds),
+    optimizeWithBalancedApproach(basePairings),
     optimizeWithRandomApproach(basePairings),
   ];
 
@@ -271,14 +244,7 @@ function optimizeRoundRobinOrder(
   }
 
   // Apply iterative improvement
-  const improvedOrder = improveRoundRobinOrder(
-    bestOrder,
-    alliances,
-    totalRounds
-  );
-
-  // Final optimization: allow swapping matches within rounds to further minimize back-to-back
-  return optimizeWithinRoundSwaps(improvedOrder, alliances, totalRounds);
+  return improveRoundRobinOrder(bestOrder, alliances, totalRounds);
 }
 
 /**
@@ -326,18 +292,10 @@ function optimizeWithGreedyApproach(
  * Optimizes match order using balanced approach considering multiple rounds
  */
 function optimizeWithBalancedApproach(
-  pairings: RoundRobinPairing[],
-  alliances: Alliance[],
-  totalRounds: number
+  pairings: RoundRobinPairing[]
 ): RoundRobinPairing[] {
   const result: RoundRobinPairing[] = [];
   const remaining = [...pairings];
-
-  // Track back-to-back counts per alliance to balance them
-  const backToBackCounts = new Map<string, number>();
-  for (const alliance of alliances) {
-    backToBackCounts.set(alliance.id, 0);
-  }
 
   // Start with the first match
   result.push(remaining.shift()!);
@@ -359,19 +317,14 @@ function optimizeWithBalancedApproach(
 
       let score = 0;
       if (wouldCreateBackToBack) {
-        // Penalty increases based on how many back-to-backs this alliance already has
-        for (const allianceId of currentAlliances) {
-          if (lastAlliances.has(allianceId)) {
-            const currentCount = backToBackCounts.get(allianceId) || 0;
-            score += 100 + currentCount * 50; // Escalating penalty
-          }
-        }
+        score += 100; // Base penalty for back-to-back
       } else {
-        score -= 75; // Bonus for avoiding back-to-back
+        score -= 50; // Bonus for avoiding back-to-back
       }
 
-      // Consider impact on cross-round transitions (more important with more rounds)
-      if (result.length === pairings.length - 1 && totalRounds > 1) {
+      // Consider impact on cross-round transitions
+      // Penalize matches that would create issues at round boundaries
+      if (result.length === pairings.length - 1) {
         // This is the last match of the round
         // Consider how it affects the first match of the next round
         const firstMatch = pairings[0]; // First match will repeat in next round
@@ -380,7 +333,7 @@ function optimizeWithBalancedApproach(
           firstAlliances.has(id)
         );
         if (crossRoundOverlap) {
-          score += 100 * totalRounds; // Penalty scales with number of rounds
+          score += 75; // Penalty for cross-round back-to-back
         }
       }
 
@@ -390,28 +343,7 @@ function optimizeWithBalancedApproach(
       }
     }
 
-    const selectedMatch = remaining.splice(bestIndex, 1)[0];
-    result.push(selectedMatch);
-
-    // Update back-to-back counts
-    const selectedAlliances = new Set([
-      selectedMatch.red.id,
-      selectedMatch.blue.id,
-    ]);
-    const wouldCreateBackToBack = [...selectedAlliances].some(id =>
-      lastAlliances.has(id)
-    );
-
-    if (wouldCreateBackToBack) {
-      for (const allianceId of selectedAlliances) {
-        if (lastAlliances.has(allianceId)) {
-          backToBackCounts.set(
-            allianceId,
-            (backToBackCounts.get(allianceId) || 0) + 1
-          );
-        }
-      }
-    }
+    result.push(remaining.splice(bestIndex, 1)[0]);
   }
 
   return result;
@@ -557,295 +489,6 @@ function improveRoundRobinOrder(
 }
 
 /**
- * Final optimization step: allows swapping matches within rounds to minimize back-to-back matches
- * This works after the initial round structure is established
- */
-function optimizeWithinRoundSwaps(
-  pairings: RoundRobinPairing[],
-  alliances: Alliance[],
-  totalRounds: number
-): RoundRobinPairing[] {
-  let currentOrder = [...pairings];
-  let improved = true;
-  let iterations = 0;
-  const maxIterations = 100;
-
-  while (improved && iterations < maxIterations) {
-    improved = false;
-    iterations++;
-
-    const currentScore = evaluateMultiRoundSchedule(
-      currentOrder,
-      alliances,
-      totalRounds
-    );
-
-    // Try swapping every pair of matches within the round
-    for (let i = 0; i < currentOrder.length - 1; i++) {
-      for (let j = i + 1; j < currentOrder.length; j++) {
-        // Create a new order with matches i and j swapped
-        const newOrder = [...currentOrder];
-        [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
-
-        const newScore = evaluateMultiRoundSchedule(
-          newOrder,
-          alliances,
-          totalRounds
-        );
-
-        if (newScore < currentScore) {
-          currentOrder = newOrder;
-          improved = true;
-          break;
-        }
-      }
-      if (improved) break;
-    }
-  }
-
-  return currentOrder;
-}
-
-/**
- * Alternative optimization that works on the complete generated schedule
- * Allows swapping matches within rounds after the full schedule is created
- */
-export function optimizeCompleteSchedule(
-  blocks: ScheduleBlock<RoundRobinRound | LunchBreak>[],
-  alliances: Alliance[]
-): ScheduleBlock<RoundRobinRound | LunchBreak>[] {
-  try {
-    const optimizedBlocks = [...blocks];
-    let improved = true;
-    let iterations = 0;
-    const maxIterations = 50;
-
-    // Get the interval from the blocks once at the start
-    const intervalMinutes = parseInt(getIntervalFromBlocks(optimizedBlocks));
-
-    if (isNaN(intervalMinutes) || intervalMinutes <= 0) {
-      console.warn(
-        'Could not determine valid interval from blocks, skipping post-optimization'
-      );
-      return blocks;
-    }
-
-    while (improved && iterations < maxIterations) {
-      improved = false;
-      iterations++;
-
-      // Get current back-to-back score
-      const allMatches = extractAllMatches(optimizedBlocks);
-      const currentScore = evaluateScheduleBackToBack(allMatches, alliances);
-
-      // Try swapping matches within each round
-      for (
-        let blockIndex = 0;
-        blockIndex < optimizedBlocks.length;
-        blockIndex++
-      ) {
-        const block = optimizedBlocks[blockIndex];
-        if (block.activity.type !== 'matches') continue;
-
-        const matches = block.activity.matches;
-
-        // Skip if not enough matches or missing start time
-        if (matches.length < 2 || !block.startTime) continue;
-
-        // Try swapping every pair of matches within this round
-        for (let i = 0; i < matches.length - 1; i++) {
-          for (let j = i + 1; j < matches.length; j++) {
-            // Swap matches i and j within this round
-            [matches[i], matches[j]] = [matches[j], matches[i]];
-
-            // Re-assign times to maintain chronological order
-            reassignMatchTimes(matches, block.startTime, intervalMinutes);
-
-            // Evaluate new score
-            const newAllMatches = extractAllMatches(optimizedBlocks);
-            const newScore = evaluateScheduleBackToBack(
-              newAllMatches,
-              alliances
-            );
-
-            if (newScore < currentScore) {
-              improved = true;
-              break;
-            } else {
-              // Revert the swap if it didn't improve
-              [matches[i], matches[j]] = [matches[j], matches[i]];
-              reassignMatchTimes(matches, block.startTime, intervalMinutes);
-            }
-          }
-          if (improved) break;
-        }
-        if (improved) break;
-      }
-    }
-
-    return optimizedBlocks;
-  } catch (error) {
-    console.error(
-      'Error during post-optimization, returning original blocks:',
-      error
-    );
-    return blocks;
-  }
-}
-
-/**
- * Helper function to extract all matches from schedule blocks
- */
-function extractAllMatches(
-  blocks: ScheduleBlock<RoundRobinRound | LunchBreak>[]
-): GeneratedMatch[] {
-  const allMatches: GeneratedMatch[] = [];
-
-  for (const block of blocks) {
-    if (block.activity.type === 'matches') {
-      allMatches.push(...block.activity.matches);
-    }
-  }
-
-  // Sort by scheduled time, handling invalid dates
-  allMatches.sort((a, b) => {
-    const aTime = a.scheduled_at ? new Date(a.scheduled_at).getTime() : 0;
-    const bTime = b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0;
-
-    // Handle invalid dates
-    const aValid = !isNaN(aTime);
-    const bValid = !isNaN(bTime);
-
-    if (!aValid && !bValid) return 0;
-    if (!aValid) return 1; // Put invalid dates at the end
-    if (!bValid) return -1;
-
-    return aTime - bTime;
-  });
-
-  return allMatches;
-}
-
-/**
- * Helper function to evaluate back-to-back matches in a complete schedule
- */
-function evaluateScheduleBackToBack(
-  matches: GeneratedMatch[],
-  alliances: Alliance[]
-): number {
-  const backToBackCounts = new Map<string, number>();
-
-  // Initialize counts
-  for (const alliance of alliances) {
-    backToBackCounts.set(alliance.id, 0);
-  }
-
-  // Count back-to-back matches
-  for (let i = 0; i < matches.length - 1; i++) {
-    const currentMatch = matches[i];
-    const nextMatch = matches[i + 1];
-
-    const currentAlliances = new Set(
-      [currentMatch.red_alliance_id, currentMatch.blue_alliance_id].filter(
-        (id): id is string => Boolean(id)
-      )
-    );
-
-    const nextAlliances = new Set(
-      [nextMatch.red_alliance_id, nextMatch.blue_alliance_id].filter(
-        (id): id is string => Boolean(id)
-      )
-    );
-
-    for (const allianceId of currentAlliances) {
-      if (nextAlliances.has(allianceId)) {
-        backToBackCounts.set(
-          allianceId,
-          (backToBackCounts.get(allianceId) || 0) + 1
-        );
-      }
-    }
-  }
-
-  // Calculate score: prioritize balance (low variance) and minimize total
-  const counts = Array.from(backToBackCounts.values());
-  if (counts.length === 0) return 0;
-
-  const mean = counts.reduce((sum, count) => sum + count, 0) / counts.length;
-  const variance =
-    counts.reduce((sum, count) => sum + Math.pow(count - mean, 2), 0) /
-    counts.length;
-  const totalBackToBack = counts.reduce((sum, count) => sum + count, 0);
-
-  // Heavily weight variance to prioritize balance
-  return variance * 1000 + totalBackToBack;
-}
-
-/**
- * Helper function to reassign match times within a round
- */
-function reassignMatchTimes(
-  matches: GeneratedMatch[],
-  roundStartTime: string,
-  intervalMinutes: number
-): void {
-  // Validate inputs
-  if (!roundStartTime || isNaN(intervalMinutes) || intervalMinutes <= 0) {
-    console.warn('Invalid parameters for reassignMatchTimes:', {
-      roundStartTime,
-      intervalMinutes,
-    });
-    return;
-  }
-
-  const currentTime = new Date(roundStartTime);
-
-  // Check if the date is valid
-  if (isNaN(currentTime.getTime())) {
-    console.warn('Invalid roundStartTime:', roundStartTime);
-    return;
-  }
-
-  for (const match of matches) {
-    match.scheduled_at = currentTime.toISOString();
-    currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
-  }
-}
-
-/**
- * Helper function to extract interval from blocks (fallback method)
- */
-function getIntervalFromBlocks(
-  blocks: ScheduleBlock<RoundRobinRound | LunchBreak>[]
-): string {
-  // Find first round with matches to calculate interval
-  for (const block of blocks) {
-    if (
-      block.activity.type === 'matches' &&
-      block.activity.matches.length >= 2
-    ) {
-      const matches = block.activity.matches;
-      const firstScheduledAt = matches[0].scheduled_at;
-      const secondScheduledAt = matches[1].scheduled_at;
-
-      if (firstScheduledAt && secondScheduledAt) {
-        const firstTime = new Date(firstScheduledAt).getTime();
-        const secondTime = new Date(secondScheduledAt).getTime();
-
-        if (!isNaN(firstTime) && !isNaN(secondTime)) {
-          const intervalMs = secondTime - firstTime;
-          const intervalMinutes = Math.round(intervalMs / 60000);
-          if (intervalMinutes > 0) {
-            return intervalMinutes.toString();
-          }
-        }
-      }
-    }
-  }
-  return '10'; // Default fallback
-}
-
-/**
  * Calculates statistics for a generated schedule
  */
 export function calculateScheduleStats(
@@ -882,6 +525,7 @@ export function calculateScheduleStats(
       g.blue_alliance_id,
       (blueAllianceCount.get(g.blue_alliance_id) ?? 0) + 1
     );
+
     // Track times for turnaround calculations
     [g.red_alliance_id, g.blue_alliance_id].forEach(id => {
       const arr = timesByAlliance.get(id) ?? [];

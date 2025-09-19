@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,8 @@ import {
   Upload,
   RefreshCw,
   Trash2,
+  Edit,
+  Clock,
 } from 'lucide-react';
 import {
   generateSchedule,
@@ -49,17 +52,27 @@ import { ScheduleStatistics } from '@/components/schedule/schedule-statistics';
 // Function to transform database records to ScheduleBlock format
 function transformScheduleData(
   scheduleRecords: DatabaseScheduleBlock[],
-  databaseMatchs: DatabaseMatch[]
+  databaseMatches: DatabaseMatch[]
 ): ScheduleBlock<RoundRobinRound | LunchBreak | DoubleEliminationRound>[] {
+  // Create a map for O(1) match lookups instead of O(n) find operations
+  const matchMap = new Map(databaseMatches.map(match => [match.id, match]));
+
   return scheduleRecords.map(record => {
+    // Pre-calculate duration to avoid repeated calculations
+    const startTime = new Date(record.start_time);
+    const endTime = record.end_time ? new Date(record.end_time) : null;
+    const duration = endTime
+      ? Math.round((endTime.getTime() - startTime.getTime()) / 60000)
+      : 30; // Default duration
+
     if (
       record.type === 'match' &&
       record.match_ids &&
       record.match_ids.length > 0
     ) {
-      // Find matches for this block
+      // Use map for O(1) lookups instead of find
       const matches = record.match_ids
-        .map(matchId => databaseMatchs.find(m => m.id === matchId))
+        .map(matchId => matchMap.get(matchId))
         .filter((m): m is DatabaseMatch => m !== undefined)
         .map((m, index) => ({
           id: m.id,
@@ -69,25 +82,15 @@ function transformScheduleData(
             ? new Date(m.scheduled_at).toISOString()
             : new Date().toISOString(),
           match_type: m.match_type,
-          round: index + 1, // We'll need to determine the actual round from the data
+          round: index + 1,
         }));
 
-      // Try to extract round number from the name or description
       const roundMatch = record.name.match(/Round (\d+)/);
       const round = roundMatch ? parseInt(roundMatch[1]) - 1 : 0;
 
-      // Calculate duration from start and end times
-      const duration = record.end_time
-        ? Math.round(
-            (new Date(record.end_time).getTime() -
-              new Date(record.start_time).getTime()) /
-              60000
-          )
-        : matches.length * 5; // Default to 5 minutes per match if no end time
-
       return {
         startTime: record.start_time,
-        duration,
+        duration: duration || matches.length * 5,
         activity: {
           type: 'matches' as const,
           matches,
@@ -99,9 +102,8 @@ function transformScheduleData(
       record.match_ids &&
       record.match_ids.length > 0
     ) {
-      // Handle playoff matches
       const matches = record.match_ids
-        .map(matchId => databaseMatchs.find(m => m.id === matchId))
+        .map(matchId => matchMap.get(matchId))
         .filter((m): m is DatabaseMatch => m !== undefined)
         .map((m, index) => ({
           id: m.id,
@@ -112,28 +114,18 @@ function transformScheduleData(
             : new Date().toISOString(),
           match_type: m.match_type,
           round: index + 1,
-          bracket: 'upper' as const, // Default to upper bracket
+          bracket: 'upper' as const,
           match_number: index + 1,
           winner_advances_to: undefined,
           loser_advances_to: undefined,
         }));
 
-      // Try to extract round number from the name or description
       const roundMatch = record.name.match(/Round (\d+)/);
       const round = roundMatch ? parseInt(roundMatch[1]) - 1 : 0;
 
-      // Calculate duration from start and end times
-      const duration = record.end_time
-        ? Math.round(
-            (new Date(record.end_time).getTime() -
-              new Date(record.start_time).getTime()) /
-              60000
-          )
-        : matches.length * 5; // Default to 5 minutes per match if no end time
-
       return {
         startTime: record.start_time,
-        duration,
+        duration: duration || matches.length * 5,
         activity: {
           type: 'playoffs' as const,
           matches,
@@ -142,36 +134,18 @@ function transformScheduleData(
         },
       };
     } else if (record.type === 'lunch_break') {
-      // Calculate duration from start and end times
-      const duration = record.end_time
-        ? Math.round(
-            (new Date(record.end_time).getTime() -
-              new Date(record.start_time).getTime()) /
-              60000
-          )
-        : 60; // Default to 60 minutes if no end time
-
       return {
         startTime: record.start_time,
-        duration,
+        duration: duration || 60,
         activity: {
           type: 'lunch' as const,
-          duration,
+          duration: duration || 60,
         },
       };
     } else {
-      // Unknown type, return as generic block
-      const duration = record.end_time
-        ? Math.round(
-            (new Date(record.end_time).getTime() -
-              new Date(record.start_time).getTime()) /
-              60000
-          )
-        : 30; // Default to 30 minutes for unknown types
-
       return {
         startTime: record.start_time,
-        duration,
+        duration: duration || 30,
         activity: {
           type: 'matches' as const,
           matches: [],
@@ -194,6 +168,7 @@ const DEFAULT_SETTINGS = {
 
 export default function ScheduleRoute() {
   const [status, setStatus] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const queryClient = useQueryClient();
 
   // Get user authentication status
@@ -252,9 +227,10 @@ export default function ScheduleRoute() {
     },
   });
 
-  // Transform database data to ScheduleBlock format
+  // Transform database data to ScheduleBlock format with better memoization
   const transformedExistingSchedule = useMemo(() => {
-    if (existingSchedule.length === 0) return [];
+    if (existingSchedule.length === 0 || existingMatches.length === 0)
+      return [];
 
     return transformScheduleData(existingSchedule, existingMatches);
   }, [existingSchedule, existingMatches]);
@@ -262,7 +238,7 @@ export default function ScheduleRoute() {
   // Check if there's existing data to display
   const hasExistingData = existingSchedule.length > 0;
 
-  function generate() {
+  const generate = useCallback(() => {
     setStatus(null);
     setGeneratedBlocks([]);
 
@@ -395,7 +371,16 @@ export default function ScheduleRoute() {
         }`
       );
     }
-  }
+  }, [
+    day,
+    startTime,
+    intervalMin,
+    rrRounds,
+    doubleEliminationInterval,
+    lunchDurationMin,
+    desiredLunchTime,
+    alliances,
+  ]);
 
   // Flatten blocks into individual matches for stats calculation
   const generatedMatchesData = useMemo(() => {
@@ -425,7 +410,7 @@ export default function ScheduleRoute() {
     },
   });
 
-  function save() {
+  const save = useCallback(() => {
     if (generatedMatchesData.length === 0) return;
 
     setStatus('Saving schedule to database...');
@@ -547,7 +532,7 @@ export default function ScheduleRoute() {
           `❌ Failed to save matches: ${error.message || 'Unknown error'}`
         );
       });
-  }
+  }, [generatedMatchesData, generatedBlocks, saveMatches, queryClient]);
 
   const clearAllScheduleData = useMutation({
     mutationFn: async () => {
@@ -585,25 +570,71 @@ export default function ScheduleRoute() {
     },
   });
 
-  function toggleRound(roundIndex: number) {
-    const newExpanded = new Set(expandedRounds);
-    if (newExpanded.has(roundIndex)) {
-      newExpanded.delete(roundIndex);
-    } else {
-      newExpanded.add(roundIndex);
-    }
-    setExpandedRounds(newExpanded);
-  }
+  const toggleRound = useCallback((roundIndex: number) => {
+    setExpandedRounds(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(roundIndex)) {
+        newExpanded.delete(roundIndex);
+      } else {
+        newExpanded.add(roundIndex);
+      }
+      return newExpanded;
+    });
+  }, []);
 
-  // Calculate stats for generated schedule
+  // Handle toggling edit mode
+  const handleToggleEdit = useCallback(() => {
+    setIsEditing(prev => !prev);
+    if (isEditing) {
+      setStatus('Configuration updated successfully!');
+    }
+  }, [isEditing]);
+
+  // Handle canceling edit mode
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  // Format configuration summary
+  const formatConfigSummary = useCallback(() => {
+    const eventDate = day.toLocaleDateString();
+    const startTimeFormatted = startTime;
+    const lunchTimeFormatted = desiredLunchTime;
+
+    return {
+      eventDate,
+      startTime: startTimeFormatted,
+      lunchTime: lunchTimeFormatted,
+      lunchDuration: `${lunchDurationMin} min`,
+      rrRounds,
+      intervalMin,
+      doubleElimInterval: doubleEliminationInterval,
+      allianceCount: alliances.length,
+    };
+  }, [
+    day,
+    startTime,
+    desiredLunchTime,
+    lunchDurationMin,
+    rrRounds,
+    intervalMin,
+    doubleEliminationInterval,
+    alliances.length,
+  ]);
+
+  // Calculate stats for generated schedule with better memoization
   const stats = useMemo(() => {
-    if (generatedBlocks.length === 0) return null;
+    if (generatedBlocks.length === 0 || alliances.length === 0) return null;
+
     const matchBlocks = generatedBlocks.filter(
       (block): block is ScheduleBlock<RoundRobinRound> =>
         block.activity.type === 'matches'
     );
+
+    if (matchBlocks.length === 0) return null;
+
     const matches = matchBlocks.flatMap(block => block.activity.matches);
-    return calculateScheduleStats(matches, alliances);
+    return calculateScheduleStats(matches, alliances, matchBlocks);
   }, [generatedBlocks, alliances]);
 
   return (
@@ -652,64 +683,201 @@ export default function ScheduleRoute() {
 
         {/* Main Content Tabs */}
         <Tabs
-          defaultValue={user ? 'config' : 'existing'}
+          defaultValue={user ? 'generation' : 'existing'}
           className="flex-1 flex flex-col space-y-4"
         >
           <TabsList
-            className={`grid w-full ${user ? 'grid-cols-3' : 'grid-cols-1'}`}
+            className={`grid w-full ${user ? 'grid-cols-2' : 'grid-cols-1'}`}
           >
             {user && (
-              <>
-                <TabsTrigger value="config" className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Configuration
-                </TabsTrigger>
-                <TabsTrigger
-                  value="generated"
-                  className="flex items-center gap-2"
-                >
-                  <Play className="h-4 w-4" />
-                  Generated Schedule
-                </TabsTrigger>
-              </>
+              <TabsTrigger
+                value="generation"
+                className="flex items-center gap-2"
+              >
+                <Play className="h-4 w-4" />
+                Schedule Generation
+              </TabsTrigger>
             )}
             <TabsTrigger value="existing" className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4" />
-              Existing Schedule
+              View Existing Schedule
             </TabsTrigger>
           </TabsList>
 
-          {/* Configuration Tab - Only show if user is logged in */}
-          {user && (
-            <TabsContent value="config" className="flex-1 space-y-6">
-              <ScheduleConfiguration
-                day={day}
-                setDay={setDay}
-                startTime={startTime}
-                setStartTime={setStartTime}
-                rrRounds={rrRounds}
-                setRrRounds={setRrRounds}
-                intervalMin={intervalMin}
-                setIntervalMin={setIntervalMin}
-                doubleEliminationInterval={doubleEliminationInterval}
-                setDoubleEliminationInterval={setDoubleEliminationInterval}
-                lunchDurationMin={lunchDurationMin}
-                setLunchDurationMin={setLunchDurationMin}
-                desiredLunchTime={desiredLunchTime}
-                setDesiredLunchTime={setDesiredLunchTime}
-                onGenerate={generate}
-                status={status}
-                alliances={alliances}
-              />
-            </TabsContent>
-          )}
-
-          {/* Generated Schedule Tab - Only show if user is logged in */}
+          {/* Schedule Generation Tab - Only show if user is logged in */}
           {user && (
             <TabsContent
-              value="generated"
+              value="generation"
               className="flex-1 flex flex-col space-y-6"
             >
+              {/* Configuration Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Schedule Configuration
+                    </CardTitle>
+                    <div className="flex gap-2">
+                      {!isEditing ? (
+                        <>
+                          <Button
+                            onClick={handleToggleEdit}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={generate}
+                            size="sm"
+                            disabled={alliances.length < 2}
+                          >
+                            <Play className="h-4 w-4 mr-2" />
+                            Generate Schedule
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={handleCancelEdit}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
+                          <Button onClick={handleToggleEdit} size="sm">
+                            Save
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                {isEditing ? (
+                  <CardContent>
+                    <ScheduleConfiguration
+                      day={day}
+                      setDay={setDay}
+                      startTime={startTime}
+                      setStartTime={setStartTime}
+                      rrRounds={rrRounds}
+                      setRrRounds={setRrRounds}
+                      intervalMin={intervalMin}
+                      setIntervalMin={setIntervalMin}
+                      doubleEliminationInterval={doubleEliminationInterval}
+                      setDoubleEliminationInterval={
+                        setDoubleEliminationInterval
+                      }
+                      lunchDurationMin={lunchDurationMin}
+                      setLunchDurationMin={setLunchDurationMin}
+                      desiredLunchTime={desiredLunchTime}
+                      setDesiredLunchTime={setDesiredLunchTime}
+                      alliances={alliances}
+                    />
+                  </CardContent>
+                ) : (
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Event Date
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          <span>{formatConfigSummary().eventDate}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Start Time
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatConfigSummary().startTime}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Lunch Time
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {formatConfigSummary().lunchTime} (
+                            {formatConfigSummary().lunchDuration})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Alliances
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold">
+                            {formatConfigSummary().allianceCount}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            alliances
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Round Robin Rounds
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold">
+                            {formatConfigSummary().rrRounds}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            rounds
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Match Interval
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold">
+                            {formatConfigSummary().intervalMin}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            min
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Playoffs Interval
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold">
+                            {formatConfigSummary().doubleElimInterval}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            min
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* Status Display */}
+              {status && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">{status}</div>
+                </div>
+              )}
+
+              {/* Stats Summary */}
+              {user && stats && <ScheduleStatistics stats={stats} />}
+
+              {/* Generated Schedule Display */}
               <RoundRobinSchedule
                 generatedBlocks={generatedBlocks}
                 expandedRounds={expandedRounds}
@@ -736,9 +904,6 @@ export default function ScheduleRoute() {
             />
           </TabsContent>
         </Tabs>
-
-        {/* Stats Summary */}
-        {user && stats && <ScheduleStatistics stats={stats} />}
       </div>
     </TooltipProvider>
   );

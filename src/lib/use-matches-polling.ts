@@ -1,6 +1,6 @@
 import type { DatabaseMatch } from '@/types';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabase/client';
+import { useSmartPolling } from './use-smart-polling';
 
 async function fetchMatches(): Promise<DatabaseMatch[]> {
   const { data, error } = await supabase
@@ -41,13 +41,12 @@ export function useMatchesPolling() {
     isLoading,
     error,
     dataUpdatedAt,
-  } = useQuery({
+  } = useSmartPolling({
     queryKey: ['matches', 'polling'],
     queryFn: fetchMatches,
-    refetchInterval: 10000, // Poll every 10 seconds
-    refetchIntervalInBackground: true,
-    staleTime: 0, // Always consider data stale to ensure polling
-    gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
+    refetchInterval: 15000, // Base interval: 15 seconds (matches change more frequently)
+    staleTime: 10000, // Consider data fresh for 10 seconds
+    gcTime: 10 * 60 * 1000, // Keep data in cache for 10 minutes
   });
 
   return {

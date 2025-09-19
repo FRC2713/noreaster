@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Save, Play } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 import type {
   RoundRobinRound,
   LunchBreak,
@@ -9,6 +10,10 @@ import type {
 } from '@/lib/schedule-generator';
 import type { DoubleEliminationRound } from '@/types';
 import { ScheduleBlock as ScheduleBlockComponent } from './schedule-block';
+import { ScheduleSkeleton } from './schedule-skeleton';
+
+// Lazy load the virtualized schedule component
+const VirtualizedSchedule = lazy(() => import('./virtualized-schedule'));
 
 interface RoundRobinScheduleProps {
   generatedBlocks: ScheduleBlock<
@@ -44,6 +49,9 @@ export function RoundRobinSchedule({
     );
   }
 
+  // Use virtual scrolling for large lists (more than 20 blocks)
+  const useVirtualScrolling = generatedBlocks.length > 20;
+
   return (
     <div className="flex-1 flex flex-col space-y-4">
       <div className="flex justify-between items-center">
@@ -61,20 +69,34 @@ export function RoundRobinSchedule({
           )}
         </Button>
       </div>
-      <ScrollArea className="flex-1">
-        <div className="space-y-4 pr-4">
-          {generatedBlocks.map((block, blockIndex) => (
-            <div key={blockIndex}>
-              <ScheduleBlockComponent
-                block={block}
-                blockIndex={blockIndex}
-                isExpanded={expandedRounds.has(blockIndex)}
-                onToggle={onToggleRound}
-              />
-            </div>
-          ))}
+
+      {useVirtualScrolling ? (
+        <div className="flex-1">
+          <Suspense fallback={<ScheduleSkeleton />}>
+            <VirtualizedSchedule
+              blocks={generatedBlocks}
+              expandedRounds={expandedRounds}
+              onToggleRound={onToggleRound}
+              height={600}
+            />
+          </Suspense>
         </div>
-      </ScrollArea>
+      ) : (
+        <ScrollArea className="flex-1">
+          <div className="space-y-4 pr-4">
+            {generatedBlocks.map((block, blockIndex) => (
+              <div key={blockIndex}>
+                <ScheduleBlockComponent
+                  block={block}
+                  blockIndex={blockIndex}
+                  isExpanded={expandedRounds.has(blockIndex)}
+                  onToggle={onToggleRound}
+                />
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

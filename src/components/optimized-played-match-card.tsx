@@ -1,49 +1,65 @@
 import type { ReactNode } from 'react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trophy } from 'lucide-react';
-import type { DatabaseMatch, MatchWithAlliances } from '@/types';
+import { useAllianceData } from '@/lib/use-alliance-data';
+import type { DatabaseMatch } from '@/types';
 
-export const PlayedMatchCard = memo(function PlayedMatchCard({
+interface OptimizedPlayedMatchCardProps {
+  match: DatabaseMatch;
+  right?: ReactNode;
+  dense?: boolean;
+}
+
+export const OptimizedPlayedMatchCard = memo(function OptimizedPlayedMatchCard({
   match,
   right,
   dense = false,
-}: {
-  match: DatabaseMatch | MatchWithAlliances;
-  right?: ReactNode;
-  dense?: boolean;
-}) {
-  // Use pre-loaded alliance data if available, otherwise fall back to individual queries
-  const redAlliance = 'redAlliance' in match ? match.redAlliance : null;
-  const blueAlliance = 'blueAlliance' in match ? match.blueAlliance : null;
+}: OptimizedPlayedMatchCardProps) {
+  const { getAllianceById } = useAllianceData();
+
+  // Memoize alliance data lookups
+  const { redAlliance, blueAlliance } = useMemo(() => {
+    const red = getAllianceById(match.red_alliance_id);
+    const blue = getAllianceById(match.blue_alliance_id);
+    return { redAlliance: red, blueAlliance: blue };
+  }, [getAllianceById, match.red_alliance_id, match.blue_alliance_id]);
+
+  // Memoize computed values
+  const { redName, blueName, hasScores, redWins, blueWins, isTie } =
+    useMemo(() => {
+      // Extract alliance names from the match object
+      const redName = Array.isArray(match.red)
+        ? match.red.map(r => r.name).join(', ')
+        : match.red?.name || redAlliance?.name || match.red_alliance_id;
+
+      const blueName = Array.isArray(match.blue)
+        ? match.blue.map(r => r.name).join(', ')
+        : match.blue?.name || blueAlliance?.name || match.blue_alliance_id;
+
+      const hasScores =
+        match.red_score !== undefined &&
+        match.red_score !== null &&
+        match.blue_score !== undefined &&
+        match.blue_score !== null;
+
+      const redWins =
+        hasScores && (match.red_score as number) > (match.blue_score as number);
+      const blueWins =
+        hasScores && (match.blue_score as number) > (match.red_score as number);
+      const isTie =
+        hasScores &&
+        (match.red_score as number) === (match.blue_score as number);
+
+      return { redName, blueName, hasScores, redWins, blueWins, isTie };
+    }, [match, redAlliance, blueAlliance]);
 
   // Safety check - if match is undefined or null, don't render
   if (!match) {
     return null;
   }
-
-  // Extract alliance names from the match object
-  const redName = Array.isArray(match.red)
-    ? match.red.map(r => r.name).join(', ')
-    : match.red?.name || redAlliance?.name || match.red_alliance_id;
-
-  const blueName = Array.isArray(match.blue)
-    ? match.blue.map(r => r.name).join(', ')
-    : match.blue?.name || blueAlliance?.name || match.blue_alliance_id;
-
-  const hasScores =
-    match.red_score !== undefined &&
-    match.red_score !== null &&
-    match.blue_score !== undefined &&
-    match.blue_score !== null;
-  const redWins =
-    hasScores && (match.red_score as number) > (match.blue_score as number);
-  const blueWins =
-    hasScores && (match.blue_score as number) > (match.red_score as number);
-  const isTie =
-    hasScores && (match.red_score as number) === (match.blue_score as number);
 
   if (dense) {
     // Dense layout for home page cards
@@ -78,6 +94,7 @@ export const PlayedMatchCard = memo(function PlayedMatchCard({
                     src={redAlliance.emblem_image_url}
                     alt={`${redAlliance.name} emblem`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="w-full h-full grid place-items-center text-sm text-muted-foreground font-bold">
@@ -136,6 +153,7 @@ export const PlayedMatchCard = memo(function PlayedMatchCard({
                     src={blueAlliance.emblem_image_url}
                     alt={`${blueAlliance.name} emblem`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="w-full h-full grid place-items-center text-sm text-muted-foreground font-bold">
@@ -190,7 +208,7 @@ export const PlayedMatchCard = memo(function PlayedMatchCard({
     return denseCardContent;
   }
 
-  // Regular layout (existing code)
+  // Regular layout (existing code) - keeping the same for now
   const cardContent = (
     <Card className="group transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer min-h-[160px]">
       <CardContent className="p-6 text-base flex flex-col gap-6">
@@ -296,6 +314,7 @@ export const PlayedMatchCard = memo(function PlayedMatchCard({
                   src={redAlliance.emblem_image_url}
                   alt={`${redAlliance.name} emblem`}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full grid place-items-center text-2xl text-muted-foreground font-bold">
@@ -369,6 +388,7 @@ export const PlayedMatchCard = memo(function PlayedMatchCard({
                   src={blueAlliance.emblem_image_url}
                   alt={`${blueAlliance.name} emblem`}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full grid place-items-center text-2xl text-muted-foreground font-bold">

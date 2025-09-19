@@ -6,6 +6,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { MatchesBlock } from '@/components/schedule/matches-block';
+import { ScheduleSkeleton } from '@/components/schedule/schedule-skeleton';
 import { formatTime } from '@/lib/utils';
 import type {
   RoundRobinRound,
@@ -67,15 +68,19 @@ export function ExistingSchedule({
     );
   }
 
+  if (scheduleLoading) {
+    return (
+      <ScrollArea className="flex-1">
+        <div className="pr-4">
+          <ScheduleSkeleton />
+        </div>
+      </ScrollArea>
+    );
+  }
+
   return (
     <ScrollArea className="flex-1">
       <div className="space-y-4 pr-4">
-        {scheduleLoading && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-            <p className="text-muted-foreground">Loading schedule...</p>
-          </div>
-        )}
         {transformedExistingSchedule.map((block, blockIndex) => (
           <div key={blockIndex}>
             {block.activity.type === 'matches' ? (
