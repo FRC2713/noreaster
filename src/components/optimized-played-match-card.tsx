@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { memo, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +13,7 @@ interface OptimizedPlayedMatchCardProps {
   dense?: boolean;
 }
 
-export const OptimizedPlayedMatchCard = memo(function OptimizedPlayedMatchCard({
+export function OptimizedPlayedMatchCard({
   match,
   right,
   dense = false,
@@ -491,4 +491,4 @@ export const OptimizedPlayedMatchCard = memo(function OptimizedPlayedMatchCard({
 
   // Otherwise, return the card content directly
   return cardContent;
-});
+}

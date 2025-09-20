@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useMatchesPolling } from '@/lib/use-matches-polling';
 import { useRankingsPolling } from '@/lib/use-rankings-polling';
 import { RankingsTable } from '@/components/rankings-table';
@@ -66,49 +66,46 @@ export default function LiveRoute() {
     };
   }, [matches]);
 
-  // Memoize the current time to avoid recalculating on every render
-  const now = useMemo(() => new Date(), []);
+  // Get current time for each render to ensure time-based logic works correctly
+  const now = new Date();
 
-  // Memoize the match rendering logic
-  const renderMatch = useCallback(
-    (match: DatabaseMatch, index: number) => {
-      const isUpcoming =
-        (match.red_score === null ||
-          match.red_score === undefined ||
-          match.blue_score === null ||
-          match.blue_score === undefined) &&
-        match.scheduled_at !== null &&
-        new Date(match.scheduled_at) > now;
-      const isRecent = playedMatches.includes(match);
-      const isNextMatch = isUpcoming && index === playedMatches.length;
+  // Render match function - removed useCallback to ensure updates
+  const renderMatch = (match: DatabaseMatch, index: number) => {
+    const isUpcoming =
+      (match.red_score === null ||
+        match.red_score === undefined ||
+        match.blue_score === null ||
+        match.blue_score === undefined) &&
+      match.scheduled_at !== null &&
+      new Date(match.scheduled_at) > now;
+    const isRecent = playedMatches.includes(match);
+    const isNextMatch = isUpcoming && index === playedMatches.length;
 
-      return (
-        <div
-          key={match.id}
-          className={`${
-            isNextMatch
-              ? 'ring-2 ring-blue-500 ring-opacity-75 rounded-lg p-1'
-              : ''
-          }`}
-        >
-          {isRecent ? (
-            <OptimizedPlayedMatchCard match={match} dense />
-          ) : (
-            <OptimizedUpcomingMatchCard match={match} dense />
-          )}
-        </div>
-      );
-    },
-    [playedMatches, now]
-  );
+    return (
+      <div
+        key={match.id}
+        className={`${
+          isNextMatch
+            ? 'ring-2 ring-blue-500 ring-opacity-75 rounded-lg p-1'
+            : ''
+        }`}
+      >
+        {isRecent ? (
+          <OptimizedPlayedMatchCard match={match} dense />
+        ) : (
+          <OptimizedUpcomingMatchCard match={match} dense />
+        )}
+      </div>
+    );
+  };
 
-  // Memoize the match list to prevent unnecessary re-renders
-  const matchList = useMemo(() => {
-    if (matchesToShow.length === 0) {
-      return <p className="text-muted-foreground">No matches available</p>;
-    }
-    return matchesToShow.map(renderMatch);
-  }, [matchesToShow, renderMatch]);
+  // Generate match list - removed useMemo to ensure updates
+  const matchList =
+    matchesToShow.length === 0 ? (
+      <p className="text-muted-foreground">No matches available</p>
+    ) : (
+      matchesToShow.map(renderMatch)
+    );
 
   return (
     <div className="w-full min-h-screen bg-background">

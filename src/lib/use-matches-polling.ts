@@ -44,8 +44,8 @@ export function useMatchesPolling() {
   } = useSmartPolling({
     queryKey: ['matches', 'polling'],
     queryFn: fetchMatches,
-    refetchInterval: 15000, // Base interval: 15 seconds (matches change more frequently)
-    staleTime: 10000, // Consider data fresh for 10 seconds
+    refetchInterval: 20000, // Base interval: 20 seconds (matches change more frequently)
+    staleTime: 15000, // Consider data fresh for 15 seconds
     gcTime: 10 * 60 * 1000, // Keep data in cache for 10 minutes
   });
 

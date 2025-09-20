@@ -88,7 +88,7 @@ export function useSmartPolling<T = unknown>({
       const hasErrors = errorCountRef.current > 0;
 
       if (!isVisibleRef.current) {
-        return refetchInterval * 4; // Slow down when tab is not visible
+        return refetchInterval * 2; // Reduce slowdown when tab is not visible (was 4x, now 2x)
       }
 
       if (hasErrors) {
@@ -99,7 +99,7 @@ export function useSmartPolling<T = unknown>({
         return refetchInterval; // Normal interval when active
       }
 
-      return refetchInterval * 2; // Slow down when inactive
+      return refetchInterval * 1.5; // Slightly slow down when inactive (was 2x, now 1.5x)
     },
     refetchIntervalInBackground: true,
     staleTime,
