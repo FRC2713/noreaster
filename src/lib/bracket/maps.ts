@@ -1,4 +1,4 @@
-import { createRankId, type BracketMatch } from '../optimized-bracket';
+import { type BracketMatch, createRankId } from '../optimized-bracket';
 
 // Define matches with numeric IDs
 export const EIGHT_ALLIANCE_MATCH_MAP: BracketMatch[] = [
@@ -607,7 +607,7 @@ export const FOUR_ALLIANCE_MATCH_MAP: BracketMatch[] = [
     round: 4,
     matchNumber: 6,
     redFrom: 3,
-    blueFrom: 4,
+    blueFrom: 5,
     redAdvancement: { win: 'champion', loss: 7 }, // Red: win→champion, loss→match 6
     blueAdvancement: { win: 7, loss: 'eliminated' }, // Blue: win→match 6, loss→eliminated
   },
@@ -616,8 +616,8 @@ export const FOUR_ALLIANCE_MATCH_MAP: BracketMatch[] = [
     bracket: 0,
     round: 4,
     matchNumber: 7,
-    redFrom: 5,
-    blueFrom: 5,
+    redFrom: 6,
+    blueFrom: 6,
     redAdvancement: { win: 'champion', loss: 'eliminated' }, // Red: win→champion, loss→eliminated
     blueAdvancement: { win: 'champion', loss: 'eliminated' }, // Blue: win→champion, loss→eliminated
   },
