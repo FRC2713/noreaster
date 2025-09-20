@@ -24,6 +24,7 @@ const Schedule = lazy(() => import('./routes/schedule'));
 const Rankings = lazy(() => import('./routes/rankings'));
 const Live = lazy(() => import('./routes/live'));
 const Docs = lazy(() => import('./routes/docs'));
+const Admin = lazy(() => import('./routes/admin'));
 
 // Create wrapped components for protected routes
 const ProtectedTeamsNew = withAuth(TeamsNew);
@@ -31,6 +32,7 @@ const ProtectedTeam = withAuth(Team);
 const ProtectedAlliancesEdit = withAuth(AlliancesEdit);
 const ProtectedAlliance = withAuth(Alliance);
 const ProtectedMatch = withAuth(Match);
+const ProtectedAdmin = withAuth(Admin);
 
 const router = createBrowserRouter(
   [
@@ -163,6 +165,14 @@ const router = createBrowserRouter(
           element: (
             <SuspenseWrapper>
               <Docs />
+            </SuspenseWrapper>
+          ),
+        },
+        {
+          path: 'admin',
+          element: (
+            <SuspenseWrapper>
+              <ProtectedAdmin />
             </SuspenseWrapper>
           ),
         },

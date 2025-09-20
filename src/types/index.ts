@@ -18,8 +18,32 @@ export interface DatabaseMatch {
   round?: number;
   match_number?: number;
   match_type: 'round_robin' | 'playoff';
+  bracket_match_id?: number | null;
+  bracket_type?: number | null;
+  is_completed?: boolean;
   red?: { name: string } | { name: string }[] | null;
   blue?: { name: string } | { name: string }[] | null;
+}
+
+// New bracket match database type
+export interface DatabaseBracketMatch {
+  id: string;
+  bracket_match_id: number;
+  bracket_type: number; // 0 = upper, 1 = lower
+  round: number;
+  match_number: number;
+  red_from: number; // Negative = rank, positive = bracket_match_id
+  blue_from: number;
+  red_win_advances_to: number | null;
+  red_loss_advances_to: number | null;
+  blue_win_advances_to: number | null;
+  blue_loss_advances_to: number | null;
+  red_win_result: 'champion' | 'eliminated' | null;
+  red_loss_result: 'champion' | 'eliminated' | null;
+  blue_win_result: 'champion' | 'eliminated' | null;
+  blue_loss_result: 'champion' | 'eliminated' | null;
+  match_id: string | null;
+  created_at: string;
 }
 
 // Optimized match type with pre-loaded alliance data
@@ -167,8 +191,61 @@ export interface AllianceRanking {
   avgRp: number;
 }
 
+// Database rankings table structure
+export interface DatabaseRanking {
+  id: string;
+  alliance_id: string;
+  rank: number;
+  played: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  avg_rp: number;
+  avg_score: number;
+  avg_auto_score: number;
+  total_rp: number;
+  total_score: number;
+  total_auto_score: number;
+  last_updated: string;
+  created_at: string;
+}
+
+// Hydrated ranking with alliance data
+export interface HydratedRanking extends DatabaseRanking {
+  alliance_name: string;
+  emblem_image_url: string | null;
+}
+
 export interface DoubleEliminationBracket {
   matches: DoubleEliminationMatch[];
+}
+
+// Enhanced bracket types with database integration
+export interface DatabaseBracketMatchWithDetails extends DatabaseBracketMatch {
+  match?: DatabaseMatch | null;
+  redAlliance?: DatabaseAlliance | null;
+  blueAlliance?: DatabaseAlliance | null;
+  isReady: boolean;
+  winner: 'red' | 'blue' | null;
+}
+
+// Advancement result type
+export interface AdvancementResult {
+  matchId: string;
+  winner: 'red' | 'blue';
+  winnerAllianceId: string;
+  loserAllianceId: string;
+  winnerAdvancesTo: number | 'champion' | 'eliminated';
+  loserAdvancesTo: number | 'champion' | 'eliminated';
+}
+
+// Bracket status type
+export interface BracketStatus {
+  totalMatches: number;
+  completedMatches: number;
+  readyMatches: number;
+  champion: string | null; // alliance ID
+  isComplete: boolean;
 }
 
 export type ScheduleBlock<

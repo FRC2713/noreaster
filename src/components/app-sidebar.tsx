@@ -10,6 +10,7 @@ import {
   User as UserIcon,
   BookOpenText,
   LogOut,
+  Settings,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -128,10 +129,18 @@ export function AppSidebar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 {user ? (
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign out
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Admin
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign out
+                    </DropdownMenuItem>
+                  </>
                 ) : (
                   <DropdownMenuItem asChild>
                     <Link to="/auth">Sign in</Link>

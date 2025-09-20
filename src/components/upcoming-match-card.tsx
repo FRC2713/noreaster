@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock, Calendar } from 'lucide-react';
 import type { DatabaseMatch, MatchWithAlliances } from '@/types';
+import { useRankingsPolling } from '@/lib/use-rankings-polling';
 
 function formatRelative(iso: string) {
   const target = new Date(iso).getTime();
@@ -46,6 +47,9 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
   showRelativeTime?: boolean;
   dense?: boolean;
 }) {
+  // Get rankings data for playoff matches
+  const { rankings } = useRankingsPolling();
+
   // Safety check - if match is undefined or null, don't render
   if (!match) {
     return null;
@@ -54,6 +58,17 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
   // Use pre-loaded alliance data if available, otherwise fall back to individual queries
   const redAlliance = 'redAlliance' in match ? match.redAlliance : null;
   const blueAlliance = 'blueAlliance' in match ? match.blueAlliance : null;
+
+  // Get alliance ranks for playoff matches
+  const isPlayoffMatch = match.match_type === 'playoff';
+  const redAllianceRank =
+    isPlayoffMatch && match.red_alliance_id
+      ? rankings.find(r => r.id === match.red_alliance_id)?.rank
+      : null;
+  const blueAllianceRank =
+    isPlayoffMatch && match.blue_alliance_id
+      ? rankings.find(r => r.id === match.blue_alliance_id)?.rank
+      : null;
 
   // Extract alliance names from the match object
   const redName = Array.isArray(match.red)
@@ -107,6 +122,7 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold text-foreground">
+                  {isPlayoffMatch && 'Playoff '}
                   {match.name?.replace('Round ', 'R').replace('Match ', 'M')}
                 </h3>
               </div>
@@ -133,9 +149,19 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
               </div>
 
               {/* Red Alliance Name */}
-              <h4 className="font-medium text-sm text-red-900 dark:text-red-100 text-center">
-                {redName}
-              </h4>
+              <div className="flex flex-col items-center gap-1">
+                <h4 className="font-medium text-sm text-red-900 dark:text-red-100 text-center">
+                  {redName}
+                </h4>
+                {redAllianceRank && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs px-2 py-0.5 h-5"
+                  >
+                    #{redAllianceRank}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* VS Section */}
@@ -161,9 +187,19 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
               </div>
 
               {/* Blue Alliance Name */}
-              <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100 text-center">
-                {blueName}
-              </h4>
+              <div className="flex flex-col items-center gap-1">
+                <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100 text-center">
+                  {blueName}
+                </h4>
+                {blueAllianceRank && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs px-2 py-0.5 h-5"
+                  >
+                    #{blueAllianceRank}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 
@@ -203,11 +239,13 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
             {match.name && (
               <div className="flex items-center gap-3">
                 <h3 className="text-xl font-bold text-foreground">
+                  {isPlayoffMatch && 'Playoff '}
                   {match.name}
                 </h3>
                 {match.round && match.match_number && (
                   <Badge className="text-sm px-3 py-1 h-7 font-medium">
-                    R{match.round}M{match.match_number}
+                    {isPlayoffMatch && 'Playoff '}R{match.round}M
+                    {match.match_number}
                   </Badge>
                 )}
               </div>
@@ -239,9 +277,16 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
             </div>
 
             {/* Red Alliance Name */}
-            <h4 className="font-bold text-xl text-red-900 dark:text-red-100 text-center max-w-[12rem] leading-tight">
-              {redName}
-            </h4>
+            <div className="flex flex-col items-center gap-2">
+              <h4 className="font-bold text-xl text-red-900 dark:text-red-100 text-center max-w-[12rem] leading-tight">
+                {redName}
+              </h4>
+              {redAllianceRank && (
+                <Badge variant="secondary" className="text-sm px-3 py-1 h-6">
+                  #{redAllianceRank}
+                </Badge>
+              )}
+            </div>
 
             {/* Red Indicator */}
             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -270,9 +315,16 @@ export const UpcomingMatchCard = memo(function UpcomingMatchCard({
             </div>
 
             {/* Blue Alliance Name */}
-            <h4 className="font-bold text-xl text-blue-900 dark:text-blue-100 text-center max-w-[12rem] leading-tight">
-              {blueName}
-            </h4>
+            <div className="flex flex-col items-center gap-2">
+              <h4 className="font-bold text-xl text-blue-900 dark:text-blue-100 text-center max-w-[12rem] leading-tight">
+                {blueName}
+              </h4>
+              {blueAllianceRank && (
+                <Badge variant="secondary" className="text-sm px-3 py-1 h-6">
+                  #{blueAllianceRank}
+                </Badge>
+              )}
+            </div>
 
             {/* Blue Indicator */}
             <div className="w-3 h-3 rounded-full bg-blue-500"></div>

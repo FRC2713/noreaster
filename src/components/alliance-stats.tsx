@@ -68,6 +68,7 @@ interface AllianceStatsProps {
   allianceId: string;
   matches: DatabaseMatch[];
   color: 'red' | 'blue';
+  emblemUrl?: string | null;
   className?: string;
 }
 
@@ -75,6 +76,7 @@ export function AllianceStats({
   allianceId,
   matches,
   color,
+  emblemUrl,
   className = '',
 }: AllianceStatsProps) {
   const stats = useMemo(
@@ -99,32 +101,23 @@ export function AllianceStats({
 
   return (
     <div
-      className={`${colors.bg} backdrop-blur-sm rounded-lg p-4 border ${colors.border} ${className}`}
+      className={`${colors.bg} backdrop-blur-sm rounded-lg p-6 ${className}`}
     >
-      <div className="text-white space-y-2">
-        <div className="text-2xl font-bold text-center flex flex-row justify-center items-baseline gap-2">
+      <div className="text-white space-y-6">
+        {/* Alliance Emblem */}
+        {emblemUrl && (
+          <div className="flex justify-center">
+            <img
+              src={emblemUrl}
+              alt="Alliance Emblem"
+              className="w-28 h-28 md:w-32 md:h-32 object-contain rounded-lg"
+            />
+          </div>
+        )}
+
+        {/* Alliance Record */}
+        <div className="text-3xl md:text-4xl font-bold text-center">
           {stats.wins}-{stats.losses}-{stats.ties}
-          <span className={`text-lg font-normal ${colors.text}`}>
-            ({stats.rankingPointAverage.toFixed(2)})
-          </span>
-        </div>
-        <div className="flex flex-row justify-center items-center gap-4">
-          <div className="flex flex-col justify-center items-center">
-            <div className={`text-sm ${colors.text} text-center`}>
-              Avg Score
-            </div>
-            <div className={`text-lg ${colors.text} text-center`}>
-              {stats.avgScore.toFixed(1)}
-            </div>
-          </div>
-          <div className="flex flex-col justify-center items-center">
-            <div className={`text-sm ${colors.text} text-center`}>
-              Avg Opp Score
-            </div>
-            <div className={`text-lg ${colors.text} text-center`}>
-              {stats.avgOpponentScore.toFixed(1)}
-            </div>
-          </div>
         </div>
       </div>
     </div>
