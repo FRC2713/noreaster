@@ -1,4 +1,4 @@
-import{c as h}from"./query-vendor-BivveeUn.js";import{s as m,c as n}from"./index-BKCnwC9K.js";import{j as e,x as l,y as b}from"./ui-vendor-CDBhOMS0.js";import{r as _}from"./react-vendor-CNeAGCso.js";async function f(a){const{data:r,error:s}=await m.from("matches").select(`
+import{c as h}from"./query-vendor-BivveeUn.js";import{s as m,c as n}from"./index-DiB4IOcY.js";import{j as e,x as l,y as b}from"./ui-vendor-CDBhOMS0.js";import{r as _}from"./react-vendor-CNeAGCso.js";async function f(a){const{data:r,error:s}=await m.from("matches").select(`
       id, 
       name, 
       red_alliance_id, 
